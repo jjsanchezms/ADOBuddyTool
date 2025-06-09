@@ -17,7 +17,7 @@ public class OutputService : IOutputService
     public OutputService(ILogger<OutputService> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         _jsonOptions = new JsonSerializerOptions
         {
             WriteIndented = true,
@@ -48,7 +48,8 @@ public class OutputService : IOutputService
             _logger.LogError(ex, "Error exporting roadmap to JSON file: {FilePath}", filePath);
             throw;
         }
-    }    public async Task ExportToCsvAsync(IEnumerable<RoadmapItem> roadmapItems, string filePath, CancellationToken cancellationToken = default)
+    }
+    public async Task ExportToCsvAsync(IEnumerable<RoadmapItem> roadmapItems, string filePath, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -62,7 +63,7 @@ public class OutputService : IOutputService
             }
 
             var csv = new StringBuilder();
-            
+
             // Header
             csv.AppendLine("Id,Title,Description,Type,Status,AssignedTo,StartDate,EndDate,Priority,StackRank,Dependencies,Tags");
 
@@ -92,7 +93,8 @@ public class OutputService : IOutputService
             _logger.LogError(ex, "Error exporting roadmap to CSV file: {FilePath}", filePath);
             throw;
         }
-    }    public void DisplayInConsole(IEnumerable<RoadmapItem> roadmapItems)
+    }
+    public void DisplayInConsole(IEnumerable<RoadmapItem> roadmapItems)
     {
         try
         {
@@ -108,8 +110,8 @@ public class OutputService : IOutputService
                 Console.WriteLine("No roadmap items found.");
                 return;
             }            // Display table header with improved clarity
-            Console.WriteLine($"{"ID",-5} {"Stack Rank",-12} {"Type",-10} {"Status",-12} {"Title",-40}");
-            Console.WriteLine("(Lower StackRank values appear first, items with N/A appear last)");            Console.WriteLine(new string('=', 80));
+            Console.WriteLine($"{"ID",-5} {"Title",-40}");
+            Console.WriteLine("(Lower StackRank values appear first, items with N/A appear last)"); Console.WriteLine(new string('=', 80));
 
             foreach (var item in items)
             {
@@ -130,7 +132,8 @@ public class OutputService : IOutputService
             _logger.LogError(ex, "Error displaying roadmap in console");
             throw;
         }
-    }    private static void DisplayRoadmapItem(RoadmapItem item)
+    }
+    private static void DisplayRoadmapItem(RoadmapItem item)
     {
         // Format StackRank with more detail and highlight if it's missing
         string stackRank;
@@ -147,12 +150,12 @@ public class OutputService : IOutputService
         {
             stackRank = "N/A (!)"; // Make missing values stand out
         }
-          // Format display in table-like structure
+        // Format display in table-like structure
         Console.WriteLine($"{item.Id,-5} {stackRank,-12} {item.Type,-10} {item.Status,-12} {TruncateString(item.Title, 40),-40}");
-        
+
         // Show description on next line with indentation
         Console.WriteLine($"      Description: {TruncateString(item.Description, 72)}");
-        
+
         // Show additional details only if they have values
         if (item.Priority.HasValue)
         {
@@ -162,22 +165,22 @@ public class OutputService : IOutputService
         {
             Console.WriteLine($"      Priority: Not set");
         }
-        
+
         // Always show StackRank info with details about how it affects sorting
         Console.WriteLine($"      StackRank: {(item.StackRank.HasValue ? $"{item.StackRank:F2} (lower values appear first)" : "Not set - will appear at the end")}");
-        
+
         if (item.StartDate.HasValue)
         {
             Console.WriteLine($"      Timeline: {item.StartDate:yyyy-MM-dd} to {item.EndDate:yyyy-MM-dd}");
         }
-  
-        
+
+
         if (item.Dependencies.Any())
         {
             Console.WriteLine($"      Dependencies: {string.Join(", ", item.Dependencies)}");
         }
     }
-    
+
     private static string TruncateString(string value, int maxLength)
     {
         if (string.IsNullOrEmpty(value)) return string.Empty;

@@ -92,3 +92,4 @@ C:\acsworkspace\CreateRoadmapADO\obj\Debug\net8.0\refint\CreateRoadmapADO.dll
 C:\acsworkspace\CreateRoadmapADO\obj\Debug\net8.0\CreateRoadmapADO.pdb
 C:\acsworkspace\CreateRoadmapADO\obj\Debug\net8.0\CreateRoadmapADO.genruntimeconfig.cache
 C:\acsworkspace\CreateRoadmapADO\obj\Debug\net8.0\ref\CreateRoadmapADO.dll
+C:\acsworkspace\CreateRoadmapADO\obj\Debug\net8.0\CreateRoadmapADO.sourcelink.json
