@@ -52,16 +52,14 @@ public interface IAzureDevOpsService
     /// <param name="wiqlQuery">WIQL query string</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of work items</returns>
-    Task<IEnumerable<WorkItem>> GetWorkItemsByQueryAsync(string wiqlQuery, CancellationToken cancellationToken = default);
-
-    /// <summary>
+    Task<IEnumerable<WorkItem>> GetWorkItemsByQueryAsync(string wiqlQuery, CancellationToken cancellationToken = default);    /// <summary>
     /// Creates an Epic work item with child items
     /// </summary>
     /// <param name="children">IDs of child work items</param>
     /// <param name="title">Title of the Epic</param>
     /// <param name="patternItemId">ID of the pattern work item that triggered this creation</param>
-    /// <returns>Task representing the asynchronous operation</returns>
-    Task CreateEpicAsync(List<int> children, string title, int patternItemId = 0);
+    /// <returns>The ID of the created Epic work item</returns>
+    Task<int> CreateEpicAsync(List<int> children, string title, int patternItemId = 0);
     
     /// <summary>
     /// Creates a Release Train work item with child items
@@ -69,8 +67,16 @@ public interface IAzureDevOpsService
     /// <param name="children">IDs of child work items</param>
     /// <param name="title">Title of the Release Train</param>
     /// <param name="patternItemId">ID of the pattern work item that triggered this creation</param>
+    /// <returns>The ID of the created Release Train work item</returns>
+    Task<int> CreateReleaseTrainAsync(List<int> children, string title, int patternItemId = 0);
+    
+    /// <summary>
+    /// Updates a work item's title
+    /// </summary>
+    /// <param name="workItemId">ID of the work item to update</param>
+    /// <param name="newTitle">The new title for the work item</param>
     /// <returns>Task representing the asynchronous operation</returns>
-    Task CreateReleaseTrainAsync(List<int> children, string title, int patternItemId = 0);
+    Task UpdateWorkItemTitleAsync(int workItemId, string newTitle);
     
     /// <summary>
     /// Checks if a work item has an existing related auto-generated Epic or Release Train

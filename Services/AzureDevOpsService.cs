@@ -247,9 +247,7 @@ public class AzureDevOpsService : IAzureDevOpsService
             _logger.LogError(ex, "Error checking for existing parent item for work item #{WorkItemId}", workItemId);
             return 0; // Return 0 instead of throwing to allow the process to continue
         }
-    }
-
-    public async Task CreateEpicAsync(List<int> children, string title, int patternItemId = 0)
+    }    public async Task<int> CreateEpicAsync(List<int> children, string title, int patternItemId = 0)
     {
         _logger.LogInformation("Creating Epic with title: {Title}", title);
         _logger.LogInformation("Child items: {ChildrenCount}", children.Count);
@@ -275,6 +273,8 @@ public class AzureDevOpsService : IAzureDevOpsService
                 _logger.LogInformation("Successfully created Epic #{EpicId}: {Title}", epicId, title);
                 Console.WriteLine($"Successfully created Epic #{epicId}: {title}");
             }
+            
+            return epicId;
         }
         catch (Exception ex)
         {
@@ -283,13 +283,14 @@ public class AzureDevOpsService : IAzureDevOpsService
             throw;
         }
     }
-    
-    public async Task CreateReleaseTrainAsync(List<int> children, string title, int patternItemId = 0)
+      public async Task<int> CreateReleaseTrainAsync(List<int> children, string title, int patternItemId = 0)
     {
         _logger.LogInformation("Creating Release Train with title: {Title}, patternItemId: {PatternItemId}", title, patternItemId);
         _logger.LogInformation("Child items: {ChildrenCount}", children.Count);
         Console.WriteLine($"Creating Release Train: {title}");
-        Console.WriteLine($"With {children.Count} children: {string.Join(", ", children)}");        try
+        Console.WriteLine($"With {children.Count} children: {string.Join(", ", children)}");
+
+        try
         {
             // Create the Release Train as a different work item type to distinguish from Epic
             var releaseTrainId = await CreateWorkItemAsync("Release Train", title);
@@ -308,6 +309,8 @@ public class AzureDevOpsService : IAzureDevOpsService
                 _logger.LogInformation("Successfully created Release Train #{ReleaseTrainId}: {Title}", releaseTrainId, title);
                 Console.WriteLine($"Successfully created Release Train #{releaseTrainId}: {title}");
             }
+            
+            return releaseTrainId;
         }
         catch (Exception ex)
         {
@@ -583,6 +586,46 @@ public class AzureDevOpsService : IAzureDevOpsService
         }
         
         _logger.LogInformation($"Successfully created {childrenIds.Count} relations for work item #{parentId}");
+    }
+
+    public async Task UpdateWorkItemTitleAsync(int workItemId, string newTitle)
+    {
+        try
+        {
+            _logger.LogInformation("Updating work item #{WorkItemId} title to: {NewTitle}", workItemId, newTitle);
+            
+            var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?api-version=7.0";
+            
+            var patchOperation = new[]
+            {
+                new 
+                {
+                    op = "replace",
+                    path = "/fields/System.Title",
+                    value = newTitle
+                }
+            };
+
+            var jsonContent = JsonSerializer.Serialize(patchOperation, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json-patch+json");
+            
+            var response = await _httpClient.PatchAsync(url, content);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Failed to update work item #{WorkItemId} title. Status: {StatusCode}, Content: {Content}", 
+                    workItemId, response.StatusCode, errorContent);
+                throw new HttpRequestException($"Failed to update work item title with status {response.StatusCode}: {errorContent}");
+            }
+            
+            _logger.LogInformation("Successfully updated work item #{WorkItemId} title", workItemId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating work item #{WorkItemId} title", workItemId);
+            throw;
+        }
     }
 }
 

@@ -12,6 +12,9 @@ public class RoadmapService : IRoadmapService
 {
     private readonly ILogger<RoadmapService> _logger;
     private readonly IAzureDevOpsService _azureDevOpsService;
+    
+    // Track epic/release train operations for summary
+    public EpicReleaseTrainSummary OperationsSummary { get; private set; } = new();
 
     public RoadmapService(ILogger<RoadmapService> logger, IAzureDevOpsService azureDevOpsService)
     {
@@ -24,6 +27,13 @@ public class RoadmapService : IRoadmapService
         try
         {
             _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
+            
+            // Reset summary for this operation
+            OperationsSummary = new EpicReleaseTrainSummary
+            {
+                TotalBacklogItemsProcessed = workItems.Count(),
+                BacklogReadSuccessfully = true
+            };
 
             // Process special titles to create epics/release trains
             await ProcessSpecialTitlesAsync(workItems);
@@ -40,9 +50,12 @@ public class RoadmapService : IRoadmapService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating roadmap from work items");
+            OperationsSummary.BacklogReadSuccessfully = false;
             throw;
         }
-    }    /// <summary>
+    }
+
+    /// <summary>
     /// Processes work items to identify special title patterns and create epics/release trains
     /// </summary>
     /// <param name="workItems">Collection of work items</param>
@@ -55,15 +68,18 @@ public class RoadmapService : IRoadmapService
 
         List<int> currentChildren = new();
         string? currentTitle = null;
+        int? currentExistingId = null;
         bool isCollectingItems = false;
         bool isReleaseTrain = false;
 
-        _logger.LogInformation("Scanning for special title patterns in work items");        foreach (var workItem in workItemsList)
+        _logger.LogInformation("Scanning for special title patterns in work items");
+
+        foreach (var workItem in workItemsList)
         {
             // Check for special title patterns
-            // Match titles like "----- TITLE -----rt" or "----- TITLE -----e"
-            // with any number of dashes and spaces
-            var patternStart = new Regex(@"^-+\s*(.*?)\s*-+(?:rt|e)$");
+            // Match titles like "----- TITLE -----rt" or "----- TITLE -----e" or with IDs like ":1234"
+            // Pattern: ^-+\s*(.*?)\s*-+(?:rt|e)(?::(\d+))?$
+            var patternStart = new Regex(@"^-+\s*(.*?)\s*-+(?:rt|e)(?::(\d+))?$");
             var match = patternStart.Match(workItem.Title);
             
             if (match.Success)
@@ -72,18 +88,31 @@ public class RoadmapService : IRoadmapService
                 if (isCollectingItems && currentTitle != null && currentChildren.Any())
                 {
                     _logger.LogInformation("Creating previous group before starting new one");
-                    await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain);
+                    await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain, currentExistingId);
                     currentChildren.Clear();
                 }
 
                 // Extract new title from between the markers
                 currentTitle = match.Groups[1].Value.Trim();
-                isReleaseTrain = workItem.Title.EndsWith("rt");
+                
+                // Extract existing work item ID if present
+                currentExistingId = null;
+                if (match.Groups.Count > 2 && !string.IsNullOrEmpty(match.Groups[2].Value))
+                {
+                    if (int.TryParse(match.Groups[2].Value, out int parsedId))
+                    {
+                        currentExistingId = parsedId;
+                    }
+                }
+                
+                isReleaseTrain = workItem.Title.Contains("rt");
                 isCollectingItems = true;
                 
-                _logger.LogInformation("Found {Type} pattern: \"{Title}\"", 
-                    isReleaseTrain ? "Release Train" : "Epic", currentTitle);
-            }            // If we're collecting items and this isn't a special title, add it to current children
+                _logger.LogInformation("Found {Type} pattern: \"{Title}\"{IdInfo}", 
+                    isReleaseTrain ? "Release Train" : "Epic", currentTitle,
+                    currentExistingId.HasValue ? $" (ID: {currentExistingId})" : "");
+            }
+            // If we're collecting items and this isn't a special title, add it to current children
             else if (isCollectingItems)
             {
                 // Check if this is an end marker without a new group (just dashes)
@@ -98,7 +127,7 @@ public class RoadmapService : IRoadmapService
                     // End current group
                     if (currentTitle != null && currentChildren.Any())
                     {
-                        await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain);
+                        await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain, currentExistingId);
                         currentChildren.Clear();
                         isCollectingItems = false;
                     }
@@ -116,92 +145,35 @@ public class RoadmapService : IRoadmapService
         if (isCollectingItems && currentTitle != null && currentChildren.Any())
         {
             _logger.LogInformation("Creating final group at end of processing");
-            await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain);
+            await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain, currentExistingId);
         }
-    }    /// <summary>
-    /// Creates an epic or release train based on collected children and pattern
+    }
+
     /// <summary>
     /// Creates an Epic or Release Train item from pattern items
     /// </summary>
-    private async Task CreateItemFromPattern(List<int> children, string title, bool isReleaseTrain)
+    private async Task CreateItemFromPattern(List<int> children, string title, bool isReleaseTrain, int? existingWorkItemId = null)
     {
         // Create a divider for better console readability
         Console.WriteLine(new string('=', 80));
         
         // Get the pattern item which should be the item with the matching pattern
         int patternItemId = children.FirstOrDefault();
-        bool shouldCreateNew = true;
         
-        if (patternItemId > 0)
+        if (existingWorkItemId.HasValue)
         {
-            // Get the pattern item to check its relations
-            var patternItem = await _azureDevOpsService.GetWorkItemByIdAsync(patternItemId);
-              if (patternItem != null)
-            {                // Use a simpler approach: query for Epics and Release Trains with auto-generated tag first
-                // Then filter by checking relations in code rather than complex WIQL
-                var wiqlQuery = $"SELECT [System.Id] FROM WorkItems " +
-                               $"WHERE [System.WorkItemType] IN ('Epic', 'Release Train') " +
-                               $"AND [System.Tags] CONTAINS 'auto-generated'";
-                               
-                var candidateItems = await _azureDevOpsService.GetWorkItemsByQueryAsync(wiqlQuery);
-                
-                // Now check each candidate to see if it's related to our pattern item
-                var relatedItems = new List<WorkItem>();
-                foreach (var candidate in candidateItems)
-                {
-                    try
-                    {                        // Get the full work item with relations
-                        var fullCandidate = await _azureDevOpsService.GetWorkItemByIdAsync(candidate.Id);
-                        if (fullCandidate?.Relations != null)
-                        {
-                            // Check if this candidate is related to our pattern item
-                            var isRelated = fullCandidate.Relations.Any(r => 
-                                r.Rel?.Contains("Related") == true && 
-                                r.GetRelatedWorkItemId() == patternItemId);
-                                
-                            if (isRelated)
-                            {
-                                relatedItems.Add(candidate);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Error checking relations for work item {Id}", candidate.Id);
-                        // Continue with other candidates
-                    }                }
-                  var existingParent = relatedItems.FirstOrDefault(wi => 
-                    (wi.WorkItemType == "Epic" || wi.WorkItemType == "Release Train") && wi.Tags.Contains("auto-generated"));
-                
-                if (existingParent != null)
-                {                    // We found an existing parent, so we shouldn't create a new one
-                    var parentType = existingParent.WorkItemType == "Release Train" ? "RELEASE TRAIN" : "EPIC";
-                    Console.WriteLine($"FOUND EXISTING {parentType}: " +
-                                     $"#{existingParent.Id} - {existingParent.Title}");
-                    _logger.LogInformation("Found existing {Type} #{Id} - {Title}",
-                        parentType, 
-                        existingParent.Id, existingParent.Title);
-                    
-                    shouldCreateNew = false;
-                }
-            }
+            // Update existing epic/release train by adding missing children
+            await UpdateExistingWorkItemWithChildren(existingWorkItemId.Value, children, title, isReleaseTrain);
         }
-          if (shouldCreateNew)
+        else
         {
-            // Create new parent
-            if (isReleaseTrain)
+            // Create new epic/release train
+            int newWorkItemId = await CreateNewWorkItemFromPattern(children, title, isReleaseTrain, patternItemId);
+            
+            // Update the pattern work item title to include the newly created ID
+            if (newWorkItemId > 0 && patternItemId > 0)
             {
-                Console.WriteLine($"CREATING RELEASE TRAIN: \"{title}\"");
-                Console.WriteLine($"WITH {children.Count} CHILDREN: {string.Join(", ", children)}");
-                _logger.LogInformation("Creating Release Train: {Title} with {Count} children", title, children.Count);
-                await _azureDevOpsService.CreateReleaseTrainAsync(new List<int>(children), title, patternItemId);
-            }
-            else
-            {
-                Console.WriteLine($"CREATING EPIC: \"{title}\"");
-                Console.WriteLine($"WITH {children.Count} CHILDREN: {string.Join(", ", children)}");
-                _logger.LogInformation("Creating Epic: {Title} with {Count} children", title, children.Count);
-                await _azureDevOpsService.CreateEpicAsync(new List<int>(children), title, patternItemId);
+                await UpdatePatternItemWithId(patternItemId, title, isReleaseTrain, newWorkItemId);
             }
         }
         
@@ -209,6 +181,95 @@ public class RoadmapService : IRoadmapService
         
         // Short delay to ensure logs are readable and any API rate limits are respected
         await Task.Delay(100);
+    }
+
+    /// <summary>
+    /// Updates an existing epic/release train by adding missing child relations
+    /// </summary>
+    private async Task UpdateExistingWorkItemWithChildren(int existingWorkItemId, List<int> children, string title, bool isReleaseTrain)
+    {
+        var workItemType = isReleaseTrain ? "Release Train" : "Epic";
+        Console.WriteLine($"UPDATING EXISTING {workItemType.ToUpper()}: #{existingWorkItemId} - \"{title}\"");
+        Console.WriteLine($"WITH {children.Count} CHILDREN: {string.Join(", ", children)}");
+        
+        _logger.LogInformation("Updating existing {Type} #{Id} with {Count} children", workItemType, existingWorkItemId, children.Count);
+        
+        // Track the update operation
+        OperationsSummary.Operations.Add(new EpicReleaseTrainOperation
+        {
+            Type = workItemType,
+            Operation = OperationType.Updated,
+            Title = title,
+            Id = existingWorkItemId,
+            TotalWorkItems = children.Count,
+            NewRelationsAdded = children.Count // For now, assume all are new (could be enhanced to check existing relations)
+        });
+        
+        // TODO: Implement logic to check existing relations and only add missing ones
+        // For now, we'll create relations to all children (some might already exist)
+        foreach (var childId in children)
+        {
+            try
+            {
+                await _azureDevOpsService.CreateRelationAsync(existingWorkItemId, childId, "Child relation from pattern processing");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to create relation from {ParentId} to {ChildId} (may already exist)", existingWorkItemId, childId);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Creates a new epic/release train from the pattern
+    /// </summary>
+    private async Task<int> CreateNewWorkItemFromPattern(List<int> children, string title, bool isReleaseTrain, int patternItemId)
+    {
+        var workItemType = isReleaseTrain ? "Release Train" : "Epic";
+        Console.WriteLine($"CREATING NEW {workItemType.ToUpper()}: \"{title}\"");
+        Console.WriteLine($"WITH {children.Count} CHILDREN: {string.Join(", ", children)}");
+        
+        _logger.LogInformation("Creating new {Type}: {Title} with {Count} children", workItemType, title, children.Count);
+        
+        int newWorkItemId;
+        if (isReleaseTrain)
+        {
+            newWorkItemId = await _azureDevOpsService.CreateReleaseTrainAsync(new List<int>(children), title, patternItemId);
+        }
+        else
+        {
+            newWorkItemId = await _azureDevOpsService.CreateEpicAsync(new List<int>(children), title, patternItemId);
+        }
+        
+        // Track the creation operation
+        if (newWorkItemId > 0)
+        {
+            OperationsSummary.Operations.Add(new EpicReleaseTrainOperation
+            {
+                Type = workItemType,
+                Operation = OperationType.Created,
+                Title = title,
+                Id = newWorkItemId,
+                TotalWorkItems = children.Count,
+                NewRelationsAdded = children.Count
+            });
+        }
+        
+        return newWorkItemId;
+    }
+
+    /// <summary>
+    /// Updates the pattern work item title to include the newly created work item ID
+    /// </summary>
+    private async Task UpdatePatternItemWithId(int patternItemId, string title, bool isReleaseTrain, int newWorkItemId)
+    {
+        var suffix = isReleaseTrain ? "rt" : "e";
+        var newTitle = $"----- {title} -----{suffix}:{newWorkItemId}";
+        
+        _logger.LogInformation("Updating pattern item #{PatternItemId} title to include created work item ID #{NewWorkItemId}", 
+            patternItemId, newWorkItemId);
+        
+        await _azureDevOpsService.UpdateWorkItemTitleAsync(patternItemId, newTitle);
     }
 
     public RoadmapItem ConvertToRoadmapItem(WorkItem workItem)
@@ -238,7 +299,8 @@ public class RoadmapService : IRoadmapService
 
     public IEnumerable<RoadmapItem> SortRoadmapItems(IEnumerable<RoadmapItem> roadmapItems)
     {
-        return roadmapItems            .OrderBy(item => item.StackRank ?? double.MaxValue) // Sort by StackRank (ASC) first
+        return roadmapItems
+            .OrderBy(item => item.StackRank ?? double.MaxValue) // Sort by StackRank (ASC) first
             .ThenByDescending(item => item.Priority ?? 0) // Then by priority (DESC)
             .ThenBy(item => item.StartDate ?? DateTime.MaxValue) // Then by start date (ASC)
             .ThenBy(item => item.Title); // Finally alphabetical

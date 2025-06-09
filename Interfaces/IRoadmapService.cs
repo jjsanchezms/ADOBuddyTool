@@ -44,4 +44,9 @@ public interface IRoadmapService
     /// <param name="title">Title of the Release Train</param>
     /// <returns>Task representing the asynchronous operation</returns>
     Task CreateReleaseTrainAsync(List<int> children, string title);
+
+    /// <summary>
+    /// Gets the summary of epic/release train operations performed
+    /// </summary>
+    EpicReleaseTrainSummary OperationsSummary { get; }
 }
