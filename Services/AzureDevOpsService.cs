@@ -57,11 +57,10 @@ public class AzureDevOpsService : IAzureDevOpsService
     public async Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, CancellationToken cancellationToken = default)
     {
         try
-        {
-            const string workItemType = "Feature"; // Hardcoded to only retrieve Features
+        {            const string workItemType = "Feature"; // Hardcoded to only retrieve Features
 
-            // WIQL query to retrieve work items ordered by BacklogPriority, filtered by AreaPath and excluding Removed state
-            var wiqlQuery = $"SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] = '{workItemType}' AND [System.AreaPath] UNDER 'SPOOL\\Resource Provider' AND [System.State] NOT IN ('Removed','Closed') ORDER BY [Microsoft.VSTS.Common.StackRank] ASC, [System.Id] ASC";
+            // WIQL query to retrieve work items ordered by BacklogPriority, filtered by AreaPath, excluding Removed state and KTLO tasks
+            var wiqlQuery = $"SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] = '{workItemType}' AND [System.AreaPath] UNDER 'SPOOL\\Resource Provider' AND [System.State] NOT IN ('Removed','Closed') AND NOT [System.Tags] CONTAINS 'WeeklyDeploymentTasks' ORDER BY [Microsoft.VSTS.Common.StackRank] ASC, [System.Id] ASC";
             var workItemIds = await ExecuteWiqlQueryAsync(wiqlQuery, cancellationToken);
 
             // Take only the requested number of IDs
@@ -166,10 +165,9 @@ public class AzureDevOpsService : IAzureDevOpsService
                     {
                         // Get the related work item
                         var relatedItem = await GetWorkItemByIdAsync(relatedId, cancellationToken);
-                        
-                        // Check if it's an Epic with auto-generated tag and is not the current work item
+                          // Check if it's an Epic or Release Train with auto-generated tag and is not the current work item
                         if (relatedItem != null && 
-                            relatedItem.WorkItemType == "Epic" &&
+                            (relatedItem.WorkItemType == "Epic" || relatedItem.WorkItemType == "Release Train") &&
                             relatedItem.Tags.Contains("auto-generated"))
                         {
                             _logger.LogInformation("Found existing related auto-generated parent: #{RelatedId} ({Title})", 
@@ -216,13 +214,12 @@ public class AzureDevOpsService : IAzureDevOpsService
         try
         {
             _logger.LogInformation("Checking for existing parent for work item #{WorkItemId}", workItemId);
-            
-            // Build the WIQL query to find Epic work items that have a Related link to this work item
+              // Build the WIQL query to find Epic or Release Train work items that have a Related link to this work item
             // and also have the auto-generated tag
             var wiqlQuery = $@"
                 SELECT [System.Id]
                 FROM WorkItems 
-                WHERE [System.WorkItemType] = 'Epic' 
+                WHERE [System.WorkItemType] IN ('Epic', 'Release Train') 
                 AND [System.Tags] CONTAINS 'auto-generated'
                 AND [System.Id] IN (
                     SELECT [System.Id] 
@@ -292,12 +289,10 @@ public class AzureDevOpsService : IAzureDevOpsService
         _logger.LogInformation("Creating Release Train with title: {Title}, patternItemId: {PatternItemId}", title, patternItemId);
         _logger.LogInformation("Child items: {ChildrenCount}", children.Count);
         Console.WriteLine($"Creating Release Train: {title}");
-        Console.WriteLine($"With {children.Count} children: {string.Join(", ", children)}");
-
-        try
+        Console.WriteLine($"With {children.Count} children: {string.Join(", ", children)}");        try
         {
-            // Create the Release Train as an Epic (assuming Release Train is not a native work item type)
-            var releaseTrainId = await CreateWorkItemAsync("Epic", $"RELEASE TRAIN: {title}");
+            // Create the Release Train as a different work item type to distinguish from Epic
+            var releaseTrainId = await CreateWorkItemAsync("Release Train", title);
             
             if (releaseTrainId > 0)
             {

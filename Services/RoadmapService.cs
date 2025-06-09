@@ -83,13 +83,15 @@ public class RoadmapService : IRoadmapService
                 
                 _logger.LogInformation("Found {Type} pattern: \"{Title}\"", 
                     isReleaseTrain ? "Release Train" : "Epic", currentTitle);
-            }
-            // If we're collecting items and this isn't a special title, add it to current children
+            }            // If we're collecting items and this isn't a special title, add it to current children
             else if (isCollectingItems)
             {
                 // Check if this is an end marker without a new group (just dashes)
-                if (workItem.Title.StartsWith("----") && workItem.Title.EndsWith("----") && 
-                    !workItem.Title.Contains("rt") && !workItem.Title.Contains("e"))
+                // Match patterns that start and end with at least 3 dashes and don't contain "rt" or "e" at the end
+                var isEndMarker = workItem.Title.StartsWith("---") && workItem.Title.EndsWith("---") && 
+                    !workItem.Title.EndsWith("rt") && !workItem.Title.EndsWith("e");
+                
+                if (isEndMarker)
                 {
                     _logger.LogInformation("Found end marker: {Title}", workItem.Title);
                     
@@ -135,11 +137,10 @@ public class RoadmapService : IRoadmapService
             // Get the pattern item to check its relations
             var patternItem = await _azureDevOpsService.GetWorkItemByIdAsync(patternItemId);
               if (patternItem != null)
-            {
-                // Use a simpler approach: query for Epics with auto-generated tag first
+            {                // Use a simpler approach: query for Epics and Release Trains with auto-generated tag first
                 // Then filter by checking relations in code rather than complex WIQL
                 var wiqlQuery = $"SELECT [System.Id] FROM WorkItems " +
-                               $"WHERE [System.WorkItemType] = 'Epic' " +
+                               $"WHERE [System.WorkItemType] IN ('Epic', 'Release Train') " +
                                $"AND [System.Tags] CONTAINS 'auto-generated'";
                                
                 var candidateItems = await _azureDevOpsService.GetWorkItemsByQueryAsync(wiqlQuery);
@@ -169,25 +170,23 @@ public class RoadmapService : IRoadmapService
                         _logger.LogWarning(ex, "Error checking relations for work item {Id}", candidate.Id);
                         // Continue with other candidates
                     }                }
-                
-                var existingParent = relatedItems.FirstOrDefault(wi => 
-                    wi.WorkItemType == "Epic" && wi.Tags.Contains("auto-generated"));
+                  var existingParent = relatedItems.FirstOrDefault(wi => 
+                    (wi.WorkItemType == "Epic" || wi.WorkItemType == "Release Train") && wi.Tags.Contains("auto-generated"));
                 
                 if (existingParent != null)
-                {
-                    // We found an existing parent, so we shouldn't create a new one
-                    Console.WriteLine($"FOUND EXISTING {(isReleaseTrain ? "RELEASE TRAIN" : "EPIC")}: " +
+                {                    // We found an existing parent, so we shouldn't create a new one
+                    var parentType = existingParent.WorkItemType == "Release Train" ? "RELEASE TRAIN" : "EPIC";
+                    Console.WriteLine($"FOUND EXISTING {parentType}: " +
                                      $"#{existingParent.Id} - {existingParent.Title}");
                     _logger.LogInformation("Found existing {Type} #{Id} - {Title}",
-                        isReleaseTrain ? "Release Train" : "Epic", 
+                        parentType, 
                         existingParent.Id, existingParent.Title);
                     
                     shouldCreateNew = false;
                 }
             }
         }
-        
-        if (shouldCreateNew)
+          if (shouldCreateNew)
         {
             // Create new parent
             if (isReleaseTrain)
