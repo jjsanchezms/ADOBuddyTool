@@ -6,12 +6,12 @@ using Microsoft.Extensions.Logging;
 namespace CreateRoadmapADO.Services;
 
 /// <summary>
-/// Service for performing comprehensive Azure DevOps hygiene checks on Release Train and Feature work items.
+/// Service for performing comprehensive Azure DevOps hygiene checks on Release Train work items.
 /// 
 /// This service orchestrates multiple hygiene check implementations to validate data quality, consistency, 
 /// and completeness across Release Trains and their associated Feature work items. It helps identify common 
 /// project management issues such as misaligned iteration paths, missing documentation, incomplete Release 
-/// Train setup, inconsistent work item states, and improper Feature-Release Train relationships.
+/// Train setup, and inconsistent work item states.
 /// 
 /// The service supports multiple relationship types between Release Trains and Features:
 /// - System.LinkTypes.Related (Related links)
@@ -23,11 +23,6 @@ namespace CreateRoadmapADO.Services;
 /// - Iteration path alignment with related Features
 /// - Status notes currency and adequacy
 /// - Feature state consistency
-/// 
-/// Feature Checks:
-/// - Related link validation to Release Trains
-/// - Multiple Release Train relationship warnings
-/// - Release Train state consistency checks
 /// 
 /// All checks produce detailed results with severity levels (Info, Warning, Error, Critical)
 /// and actionable recommendations for remediation.
@@ -54,15 +49,13 @@ public class HygieneCheckService
         ILogger<HygieneCheckService> logger,
         ReleaseTrainCompletenessCheck releaseTrainCompletenessCheck,
         StatusNotesDocumentationCheck statusNotesCheck,
-        FeatureStateConsistencyCheck featureStateConsistencyCheck)
-    {
+        FeatureStateConsistencyCheck featureStateConsistencyCheck)    {
         _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _releaseTrainCompletenessCheck = releaseTrainCompletenessCheck ?? throw new ArgumentNullException(nameof(releaseTrainCompletenessCheck));
         _statusNotesCheck = statusNotesCheck ?? throw new ArgumentNullException(nameof(statusNotesCheck));
         _featureStateConsistencyCheck = featureStateConsistencyCheck ?? throw new ArgumentNullException(nameof(featureStateConsistencyCheck));
-        _featureRelationshipCheck = featureRelationshipCheck ?? throw new ArgumentNullException(nameof(featureRelationshipCheck));
-    }    /// <summary>
+    }/// <summary>
     /// Determines if a Release Train title follows a separator/placeholder pattern that should be ignored for hygiene checks.
     /// These are typically formatting elements like "----------------------------- CY25 -----------------------------"
     /// </summary>
@@ -223,49 +216,7 @@ public class HygieneCheckService
                     WorkItemId = releaseTrain.Id,
                     WorkItemTitle = releaseTrain.Title,
                     WorkItemUrl = HygieneCheckContext.GenerateWorkItemUrl(releaseTrain.Id),
-                    Recommendation = "Review work item permissions and data integrity"
-                });
-            }
-        }
-
-        // Process Features
-        foreach (var feature in features)
-        {
-            try
-            {
-                // Get the Feature with its relations
-                var featureWithRelations = await _azureDevOpsService.GetWorkItemWithRelationsAsync(feature.Id, cancellationToken);
-                
-                if (featureWithRelations?.Relations != null)
-                {
-                    // Create context for Feature checks
-                    var context = new HygieneCheckContext
-                    {
-                        WorkItem = featureWithRelations,
-                        AllReleaseTrains = releaseTrains
-                    };
-
-                    // Perform Feature-specific hygiene checks
-                    var relationshipResults = await _featureRelationshipCheck.PerformCheckAsync(context, cancellationToken);
-                    summary.CheckResults.AddRange(relationshipResults);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error performing hygiene checks for Feature {Id}", feature.Id);
-                
-                summary.CheckResults.Add(new HygieneCheckResult
-                {
-                    CheckName = "Feature Hygiene Check Error",
-                    Passed = false,
-                    Severity = HygieneCheckSeverity.Error,
-                    Description = "Error occurred during feature hygiene check",
-                    Details = $"Exception: {ex.Message}",
-                    WorkItemId = feature.Id,
-                    WorkItemTitle = feature.Title,
-                    WorkItemUrl = HygieneCheckContext.GenerateWorkItemUrl(feature.Id),
-                    Recommendation = "Review work item permissions and data integrity"
-                });
+                    Recommendation = "Review work item permissions and data integrity"                });
             }
         }
 
@@ -273,4 +224,5 @@ public class HygieneCheckService
             summary.PassedChecks, summary.TotalChecks);
 
         return summary;
-    }}
+    }
+}

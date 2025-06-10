@@ -38,13 +38,10 @@ try
     var releaseTrainCompletenessCheck = new ReleaseTrainCompletenessCheck(
         releaseTrainFeatureCountCheck, 
         iterationPathAlignmentCheck,
-        loggerFactory.CreateLogger<ReleaseTrainCompletenessCheck>());
-    var statusNotesDocumentationCheck = new StatusNotesDocumentationCheck(
+        loggerFactory.CreateLogger<ReleaseTrainCompletenessCheck>());    var statusNotesDocumentationCheck = new StatusNotesDocumentationCheck(
         loggerFactory.CreateLogger<StatusNotesDocumentationCheck>());
     var featureStateConsistencyCheck = new FeatureStateConsistencyCheck(
         loggerFactory.CreateLogger<FeatureStateConsistencyCheck>());
-    var featureReleaseTrainRelationshipCheck = new FeatureReleaseTrainRelationshipCheck(
-        loggerFactory.CreateLogger<FeatureReleaseTrainRelationshipCheck>());
     
     var hygieneLogger = loggerFactory.CreateLogger<HygieneCheckService>();
     var hygieneService = new HygieneCheckService(
@@ -52,8 +49,7 @@ try
         hygieneLogger,
         releaseTrainCompletenessCheck,
         statusNotesDocumentationCheck,
-        featureStateConsistencyCheck,
-        featureReleaseTrainRelationshipCheck);
+        featureStateConsistencyCheck);
       // Create and run the application
     var app = new RoadmapApplication(azureDevOpsService, roadmapService, outputService, hygieneService, logger);
     await app.RunAsync(args);
