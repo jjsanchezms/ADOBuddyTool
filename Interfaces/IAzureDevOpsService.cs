@@ -36,10 +36,8 @@ public interface IAzureDevOpsService
     /// <param name="workItemId">Work item ID</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Work item details including relations</returns>
-    Task<WorkItem?> GetWorkItemWithRelationsAsync(int workItemId, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Checks if a work item has a related auto-generated Epic or Release Train
+    Task<WorkItem?> GetWorkItemWithRelationsAsync(int workItemId, CancellationToken cancellationToken = default);    /// <summary>
+    /// Checks if a work item has a related auto-generated Release Train
     /// </summary>
     /// <param name="workItemId">Work item ID to check</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -52,15 +50,8 @@ public interface IAzureDevOpsService
     /// <param name="wiqlQuery">WIQL query string</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of work items</returns>
-    Task<IEnumerable<WorkItem>> GetWorkItemsByQueryAsync(string wiqlQuery, CancellationToken cancellationToken = default);    /// <summary>
-    /// Creates an Epic work item with child items
-    /// </summary>
-    /// <param name="children">IDs of child work items</param>
-    /// <param name="title">Title of the Epic</param>
-    /// <param name="patternItemId">ID of the pattern work item that triggered this creation</param>
-    /// <returns>The ID of the created Epic work item</returns>
-    Task<int> CreateEpicAsync(List<int> children, string title, int patternItemId = 0);
-    
+    Task<IEnumerable<WorkItem>> GetWorkItemsByQueryAsync(string wiqlQuery, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Creates a Release Train work item with child items
     /// </summary>
@@ -79,7 +70,7 @@ public interface IAzureDevOpsService
     Task UpdateWorkItemTitleAsync(int workItemId, string newTitle);
     
     /// <summary>
-    /// Checks if a work item has an existing related auto-generated Epic or Release Train
+    /// Checks if a work item has an existing related auto-generated Release Train
     /// </summary>
     /// <param name="workItemId">ID of the work item to check</param>
     /// <param name="cancellationToken">Optional cancellation token</param>

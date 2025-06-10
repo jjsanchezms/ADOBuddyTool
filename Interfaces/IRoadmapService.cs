@@ -27,17 +27,7 @@ public interface IRoadmapService
     /// </summary>
     /// <param name="roadmapItems">Roadmap items to sort</param>
     /// <returns>Sorted roadmap items</returns>
-    IEnumerable<RoadmapItem> SortRoadmapItems(IEnumerable<RoadmapItem> roadmapItems);
-
-    /// <summary>
-    /// Creates an Epic work item with child items
-    /// </summary>
-    /// <param name="children">IDs of child work items</param>
-    /// <param name="title">Title of the Epic</param>
-    /// <returns>Task representing the asynchronous operation</returns>
-    Task CreateEpicAsync(List<int> children, string title);
-    
-    /// <summary>
+    IEnumerable<RoadmapItem> SortRoadmapItems(IEnumerable<RoadmapItem> roadmapItems);    /// <summary>
     /// Creates a Release Train work item with child items
     /// </summary>
     /// <param name="children">IDs of child work items</param>
@@ -46,7 +36,7 @@ public interface IRoadmapService
     Task CreateReleaseTrainAsync(List<int> children, string title);
 
     /// <summary>
-    /// Gets the summary of epic/release train operations performed
+    /// Gets the summary of release train operations performed
     /// </summary>
-    EpicReleaseTrainSummary OperationsSummary { get; }
+    ReleaseTrainSummary OperationsSummary { get; }
 }

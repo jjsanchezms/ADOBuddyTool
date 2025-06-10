@@ -162,12 +162,12 @@ public class AzureDevOpsService : IAzureDevOpsService
                 {
                     var relatedId = relation.GetRelatedWorkItemId();
                     if (relatedId > 0)
-                    {
-                        // Get the related work item
+                    {                        // Get the related work item
                         var relatedItem = await GetWorkItemByIdAsync(relatedId, cancellationToken);
-                          // Check if it's an Epic or Release Train with auto-generated tag and is not the current work item
+                        
+                        // Check if it's a Release Train with auto-generated tag and is not the current work item
                         if (relatedItem != null && 
-                            (relatedItem.WorkItemType == "Epic" || relatedItem.WorkItemType == "Release Train") &&
+                            relatedItem.WorkItemType == "Release Train" &&
                             relatedItem.Tags.Contains("auto-generated"))
                         {
                             _logger.LogInformation("Found existing related auto-generated parent: #{RelatedId} ({Title})", 
@@ -213,13 +213,12 @@ public class AzureDevOpsService : IAzureDevOpsService
     {
         try
         {
-            _logger.LogInformation("Checking for existing parent for work item #{WorkItemId}", workItemId);
-              // Build the WIQL query to find Epic or Release Train work items that have a Related link to this work item
+            _logger.LogInformation("Checking for existing parent for work item #{WorkItemId}", workItemId);            // Build the WIQL query to find Release Train work items that have a Related link to this work item
             // and also have the auto-generated tag
             var wiqlQuery = $@"
                 SELECT [System.Id]
                 FROM WorkItems 
-                WHERE [System.WorkItemType] IN ('Epic', 'Release Train') 
+                WHERE [System.WorkItemType] = 'Release Train' 
                 AND [System.Tags] CONTAINS 'auto-generated'
                 AND [System.Id] IN (
                     SELECT [System.Id] 
@@ -238,8 +237,7 @@ public class AzureDevOpsService : IAzureDevOpsService
                 _logger.LogInformation("Found existing parent item #{ParentId} with title: {Title}", parent.Id, parent.Title);
                 return parent.Id;
             }
-            
-            _logger.LogInformation("No existing parent found for work item #{WorkItemId}", workItemId);
+                  _logger.LogInformation("No existing parent found for work item #{WorkItemId}", workItemId);
             return 0;
         }
         catch (Exception ex)
@@ -247,43 +245,9 @@ public class AzureDevOpsService : IAzureDevOpsService
             _logger.LogError(ex, "Error checking for existing parent item for work item #{WorkItemId}", workItemId);
             return 0; // Return 0 instead of throwing to allow the process to continue
         }
-    }    public async Task<int> CreateEpicAsync(List<int> children, string title, int patternItemId = 0)
-    {
-        _logger.LogInformation("Creating Epic with title: {Title}", title);
-        _logger.LogInformation("Child items: {ChildrenCount}", children.Count);
-        Console.WriteLine($"Creating Epic: {title}");
-        Console.WriteLine($"With {children.Count} children: {string.Join(", ", children)}");
-
-        try
-        {
-            // Create the Epic work item
-            var epicId = await CreateWorkItemAsync("Epic", title);
-            
-            if (epicId > 0)
-            {
-                // Create relations to child work items
-                await CreateRelationsAsync(epicId, children);
-                
-                // If we have a pattern item ID, also create a specific relation to that item
-                if (patternItemId > 0 && !children.Contains(patternItemId))
-                {
-                    await CreateRelationAsync(epicId, patternItemId, "Auto-generated from pattern item");
-                }
-                
-                _logger.LogInformation("Successfully created Epic #{EpicId}: {Title}", epicId, title);
-                Console.WriteLine($"Successfully created Epic #{epicId}: {title}");
-            }
-            
-            return epicId;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating Epic: {Title}", title);
-            Console.WriteLine($"Error creating Epic: {ex.Message}");
-            throw;
-        }
     }
-      public async Task<int> CreateReleaseTrainAsync(List<int> children, string title, int patternItemId = 0)
+
+    public async Task<int> CreateReleaseTrainAsync(List<int> children, string title, int patternItemId = 0)
     {
         _logger.LogInformation("Creating Release Train with title: {Title}, patternItemId: {PatternItemId}", title, patternItemId);
         _logger.LogInformation("Child items: {ChildrenCount}", children.Count);
@@ -291,8 +255,7 @@ public class AzureDevOpsService : IAzureDevOpsService
         Console.WriteLine($"With {children.Count} children: {string.Join(", ", children)}");
 
         try
-        {
-            // Create the Release Train as a different work item type to distinguish from Epic
+        {            // Create the Release Train work item type
             var releaseTrainId = await CreateWorkItemAsync("Release Train", title);
             
             if (releaseTrainId > 0)

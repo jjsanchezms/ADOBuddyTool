@@ -54,7 +54,7 @@ public class RoadmapItem
 /// </summary>
 public enum RoadmapItemType
 {
-    Epic,
+    ReleaseTrain,
     Feature,
     Initiative,
     Milestone

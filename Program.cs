@@ -95,12 +95,12 @@ public class RoadmapApplication
                 _logger.LogInformation("No work items found.");
                 return;
             }            _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
-            Console.WriteLine("\nProcessing work items for special title patterns (Epics/Release Trains)...\n");
+            Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
             var roadmapItems = await _roadmapService.GenerateRoadmapAsync(workItems);
             Console.WriteLine("\nFinished processing special title patterns\n");
 
-            // Display Epic/Release Train Summary
-            DisplayEpicReleaseTrainSummary(_roadmapService.OperationsSummary);
+            // Display Release Train Summary
+            DisplayReleaseTrainSummary(_roadmapService.OperationsSummary);
 
             // Output roadmap (only if requested)
             if (options.OutputFormat != "summary")
@@ -184,13 +184,13 @@ public class RoadmapApplication
         Console.WriteLine("  CreateRoadmapADO --limit 50 --output json");
         Console.WriteLine("  CreateRoadmapADO --limit 200 --output csv --file roadmap.csv");
     }    /// <summary>
-    /// Displays a summary of Epic and Release Train operations
+    /// Displays a summary of Release Train operations
     /// </summary>
     /// <param name="summary">The operations summary to display</param>
-    private static void DisplayEpicReleaseTrainSummary(EpicReleaseTrainSummary summary)
+    private static void DisplayReleaseTrainSummary(ReleaseTrainSummary summary)
     {
         Console.WriteLine("=".PadRight(60, '='));
-        Console.WriteLine("EPIC/RELEASE TRAIN SUMMARY");
+        Console.WriteLine("RELEASE TRAIN SUMMARY");
         Console.WriteLine("=".PadRight(60, '='));
         
         if (!summary.BacklogReadSuccessfully)
@@ -204,7 +204,7 @@ public class RoadmapApplication
 
         if (!summary.Operations.Any())
         {
-            Console.WriteLine("ℹ️  No Epic or Release Train patterns found");
+            Console.WriteLine("ℹ️  No Release Train patterns found");
             Console.WriteLine();
             return;
         }
@@ -218,7 +218,7 @@ public class RoadmapApplication
             Console.WriteLine($"🆕 CREATED ({createdOps.Count}):");
             foreach (var op in createdOps)
             {
-                Console.WriteLine($"   • {op.Type} #{op.Id}: \"{op.Title}\" ({op.TotalWorkItems} work items)");
+                Console.WriteLine($"   • Release Train #{op.Id}: \"{op.Title}\" ({op.TotalWorkItems} work items)");
             }
             Console.WriteLine();
         }
@@ -231,7 +231,7 @@ public class RoadmapApplication
                 var newRelationsText = op.NewRelationsAdded > 0 
                     ? $", +{op.NewRelationsAdded} new relations" 
                     : ", no new relations needed";
-                Console.WriteLine($"   • {op.Type} #{op.Id}: \"{op.Title}\" ({op.TotalWorkItems} total work items{newRelationsText})");
+                Console.WriteLine($"   • Release Train #{op.Id}: \"{op.Title}\" ({op.TotalWorkItems} total work items{newRelationsText})");
             }
             Console.WriteLine();
         }
