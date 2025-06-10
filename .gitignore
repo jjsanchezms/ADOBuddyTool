@@ -397,3 +397,4 @@ logs/
 # Runtime generated files
 *.tmp
 *.temp
+appsettings.json
