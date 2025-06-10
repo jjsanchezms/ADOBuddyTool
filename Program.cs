@@ -4,11 +4,16 @@ using CreateRoadmapADO.Models;
 using CreateRoadmapADO.Services;
 using Microsoft.Extensions.Logging;
 
-// Setup logging
+// Parse arguments early to configure logging appropriately
+var earlyOptions = ParseEarlyArguments(args);
+
+// Setup logging with appropriate level based on output format
 using var loggerFactory = LoggerFactory.Create(builder =>
 {
     builder.AddConsole();
-    builder.SetMinimumLevel(LogLevel.Information);
+    // Use Warning level for summary mode to reduce noise
+    var logLevel = earlyOptions.OutputFormat == "summary" ? LogLevel.Warning : LogLevel.Information;
+    builder.SetMinimumLevel(logLevel);
 });
 
 try
@@ -41,6 +46,32 @@ catch (Exception ex)
 }
 
 /// <summary>
+/// Early parsing of arguments for logging configuration
+/// </summary>
+/// <param name="args">Command line arguments</param>
+/// <returns>Basic command line options</returns>
+static CommandLineOptions ParseEarlyArguments(string[] args)
+{
+    var options = new CommandLineOptions();
+    
+    for (int i = 0; i < args.Length; i++)
+    {
+        switch (args[i].ToLowerInvariant())
+        {
+            case "--output" or "-o":
+                if (i + 1 < args.Length)
+                    options.OutputFormat = args[++i];
+                break;
+            case "--summary-only" or "-s":
+                options.OutputFormat = "summary";
+                break;
+        }
+    }
+    
+    return options;
+}
+
+/// <summary>
 /// Main application class
 /// </summary>
 public class RoadmapApplication
@@ -61,11 +92,8 @@ public class RoadmapApplication
         _outputService = outputService ?? throw new ArgumentNullException(nameof(outputService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }    public async Task RunAsync(string[] args)
-    {
-        try
+    {        try
         {
-            _logger.LogInformation("Starting CreateRoadmapADO application");
-
             // Parse command line arguments
             var options = ParseArguments(args);
 
@@ -76,33 +104,51 @@ public class RoadmapApplication
                 Console.WriteLine();
                 ShowHelp();
                 return;
-            }            // Retrieve work items from Azure DevOps
-            _logger.LogInformation("Retrieving Feature work items from Azure DevOps (limit: {Limit}, area path: {AreaPath})", 
-                options.Limit, options.AreaPath);
-            var workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit, options.AreaPath!);
+            }
 
-            if (!workItems.Any())
+            // Only show startup message if not in summary mode
+            if (options.OutputFormat != "summary")
             {
-                _logger.LogInformation("No work items found in area path '{AreaPath}'.", options.AreaPath);
+                _logger.LogInformation("Starting CreateRoadmapADO application");
+            }
+
+            // Retrieve work items from Azure DevOps
+            if (options.OutputFormat != "summary")
+            {
+                _logger.LogInformation("Retrieving Feature work items from Azure DevOps (limit: {Limit}, area path: {AreaPath})", 
+                    options.Limit, options.AreaPath);
+            }
+            var workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit, options.AreaPath!);            if (!workItems.Any())
+            {
+                if (options.OutputFormat != "summary")
+                {
+                    _logger.LogInformation("No work items found in area path '{AreaPath}'.", options.AreaPath);
+                }
                 Console.WriteLine($"No Feature work items found in area path '{options.AreaPath}'.");
                 return;
             }
 
-            _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
-            Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
+            // Only show processing messages if not in summary mode
+            if (options.OutputFormat != "summary")
+            {
+                _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
+                Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
+            }
+            
             var roadmapItems = await _roadmapService.GenerateRoadmapAsync(workItems);
-            Console.WriteLine("\nFinished processing special title patterns\n");
-
-            // Display Release Train Summary
+            
+            if (options.OutputFormat != "summary")
+            {
+                Console.WriteLine("\nFinished processing special title patterns\n");
+            }            // Always display Release Train Summary (this is the main output for summary mode)
             DisplayReleaseTrainSummary(_roadmapService.OperationsSummary);
 
             // Output roadmap (only if requested)
             if (options.OutputFormat != "summary")
             {
                 await OutputRoadmapAsync(roadmapItems, options);
+                _logger.LogInformation("Application completed successfully");
             }
-
-            _logger.LogInformation("Application completed successfully");
         }
         catch (Exception ex)
         {

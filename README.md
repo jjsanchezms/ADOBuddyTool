@@ -64,7 +64,7 @@ This will create a Release Train called "Q1 2024 Release" with Features 2, 3, an
 CreateRoadmapADO --help
 
 # Basic usage (required area path parameter)
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider"
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --output summary
 
 # With custom area path and limit
 CreateRoadmapADO --area-path "MyProject\\MyTeam" --limit 50

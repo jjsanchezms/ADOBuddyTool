@@ -1,6 +1,7 @@
 using CreateRoadmapADO.Interfaces;
 using CreateRoadmapADO.Models;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace CreateRoadmapADO.Services;
@@ -184,7 +185,29 @@ public class RoadmapService
         
         _logger.LogInformation("Updating existing Release Train #{Id} with {Count} children", existingWorkItemId, children.Count);
         
-        // Track the update operation
+        // Get existing work item with relations to check what already exists
+        var existingWorkItem = await _azureDevOpsService.GetWorkItemWithRelationsAsync(existingWorkItemId);
+        var existingRelatedIds = new HashSet<int>();
+        
+        if (existingWorkItem?.Relations != null)
+        {
+            foreach (var relation in existingWorkItem.Relations)
+            {
+                if (relation.Rel == "System.LinkTypes.Related")
+                {
+                    var relatedId = relation.GetRelatedWorkItemId();
+                    if (relatedId > 0)
+                    {
+                        existingRelatedIds.Add(relatedId);
+                    }
+                }
+            }
+        }
+        
+        // Find children that don't already have relations
+        var newChildren = children.Where(childId => !existingRelatedIds.Contains(childId)).ToList();
+        
+        // Track the update operation with accurate counts
         OperationsSummary.Operations.Add(new ReleaseTrainOperation
         {
             Type = "Release Train",
@@ -192,23 +215,31 @@ public class RoadmapService
             Title = title,
             Id = existingWorkItemId,
             TotalWorkItems = children.Count,
-            NewRelationsAdded = children.Count // For now, assume all are new (could be enhanced to check existing relations)
+            NewRelationsAdded = newChildren.Count
         });
         
-        // TODO: Implement logic to check existing relations and only add missing ones
-        // For now, we'll create relations to all children (some might already exist)
-        foreach (var childId in children)
+        // Only create relations for children that don't already have them
+        if (newChildren.Any())
         {
-            try
+            _logger.LogInformation("Adding {NewCount} new relations out of {TotalCount} children", newChildren.Count, children.Count);
+            
+            foreach (var childId in newChildren)
             {
-                await _azureDevOpsService.CreateRelationAsync(existingWorkItemId, childId, "Child relation from pattern processing");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to create relation from {ParentId} to {ChildId} (may already exist)", existingWorkItemId, childId);
+                try
+                {
+                    await _azureDevOpsService.CreateRelationAsync(existingWorkItemId, childId, "Child relation from pattern processing");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to create relation from {ParentId} to {ChildId}", existingWorkItemId, childId);
+                }
             }
         }
-    }    /// <summary>
+        else
+        {
+            _logger.LogInformation("All child relations already exist for Release Train #{Id}", existingWorkItemId);
+        }
+    }/// <summary>
     /// Creates a new release train from the pattern
     /// </summary>
     private async Task<int> CreateNewWorkItemFromPattern(List<int> children, string title, int patternItemId)
