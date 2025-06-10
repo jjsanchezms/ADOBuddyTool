@@ -114,23 +114,44 @@ public class RoadmapApplication
             if (options.OutputFormat != "summary")
             {
                 _logger.LogInformation("Starting CreateRoadmapADO application");
-            }
-
-            // Retrieve work items from Azure DevOps
+            }            // Retrieve work items from Azure DevOps
             if (options.OutputFormat != "summary")
             {
-                _logger.LogInformation("Retrieving Feature work items from Azure DevOps (limit: {Limit}, area path: {AreaPath})", 
-                    options.Limit, options.AreaPath);
+                if (options.RunHygieneChecks || options.HygieneChecksOnly)
+                {
+                    _logger.LogInformation("Retrieving Feature and Release Train work items from Azure DevOps for hygiene checks (limit: {Limit}, area path: {AreaPath})", 
+                        options.Limit, options.AreaPath);
+                }
+                else
+                {
+                    _logger.LogInformation("Retrieving Feature work items from Azure DevOps (limit: {Limit}, area path: {AreaPath})", 
+                        options.Limit, options.AreaPath);
+                }
             }
-            var workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit, options.AreaPath!);            if (!workItems.Any())
+            
+            IEnumerable<WorkItem> workItems;
+            if (options.RunHygieneChecks || options.HygieneChecksOnly)
+            {
+                // For hygiene checks, get both Feature and Release Train work items
+                workItems = await _azureDevOpsService.GetWorkItemsForHygieneChecksAsync(options.Limit, options.AreaPath!);
+            }
+            else
+            {
+                // For regular roadmap generation, get only Feature work items
+                workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit, options.AreaPath!);
+            }            if (!workItems.Any())
             {
                 if (options.OutputFormat != "summary")
                 {
                     _logger.LogInformation("No work items found in area path '{AreaPath}'.", options.AreaPath);
                 }
-                Console.WriteLine($"No Feature work items found in area path '{options.AreaPath}'.");
+                
+                string workItemTypeDescription = (options.RunHygieneChecks || options.HygieneChecksOnly) 
+                    ? "Feature or Release Train work items" 
+                    : "Feature work items";
+                Console.WriteLine($"No {workItemTypeDescription} found in area path '{options.AreaPath}'.");
                 return;
-            }            // Only show processing messages if not in summary mode
+            }// Only show processing messages if not in summary mode
             if (options.OutputFormat != "summary")
             {
                 _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
@@ -368,9 +389,9 @@ public class RoadmapApplication
                     HygieneCheckSeverity.Warning => "🟡",
                     _ => "ℹ️"
                 };
-                
-                Console.WriteLine($"{severityIcon} [{check.Severity.ToString().ToUpper()}] {check.CheckName}");
+                  Console.WriteLine($"{severityIcon} [{check.Severity.ToString().ToUpper()}] {check.CheckName}");
                 Console.WriteLine($"   Work Item: #{check.WorkItemId} - {check.WorkItemTitle}");
+                Console.WriteLine($"   URL: {check.WorkItemUrl}");
                 Console.WriteLine($"   Issue: {check.Details}");
                 Console.WriteLine($"   Recommendation: {check.Recommendation}");
                 Console.WriteLine();
