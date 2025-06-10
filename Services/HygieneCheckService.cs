@@ -18,16 +18,14 @@ public class HygieneCheckService
     {
         _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = ConfigurationReader.GetAzureDevOpsOptions();    }
-
-    /// <summary>
+        _options = ConfigurationReader.GetAzureDevOpsOptions();    }    /// <summary>
     /// Generates the Azure DevOps URL for a work item
     /// </summary>
     /// <param name="workItemId">The work item ID</param>
     /// <returns>The full Azure DevOps URL to the work item</returns>
     private string GetWorkItemUrl(int workItemId)
     {
-        return $"https://dev.azure.com/{_options.Organization}/{_options.Project}/_workitems/edit/{workItemId}";
+        return $"https://{_options.Organization}.visualstudio.com/{_options.Project}/_workitems/edit/{workItemId}";
     }
 
     /// <summary>
