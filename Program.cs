@@ -99,12 +99,19 @@ public class RoadmapApplication
     {        try
         {
             // Parse command line arguments
-            var options = ParseArguments(args);
-
-            // Validate required parameters
+            var options = ParseArguments(args);            // Validate required parameters
             if (string.IsNullOrWhiteSpace(options.AreaPath))
             {
                 Console.WriteLine("Error: Area path is required.");
+                Console.WriteLine();
+                ShowHelp();
+                return;
+            }
+
+            // Validate that at least one operation is requested
+            if (!options.RunHygieneChecks && !options.CreateRoadmap)
+            {
+                Console.WriteLine("Error: At least one operation must be specified (--hygiene-checks or --create-roadmap).");
                 Console.WriteLine();
                 ShowHelp();
                 return;
@@ -115,52 +122,52 @@ public class RoadmapApplication
             {
                 _logger.LogInformation("Starting CreateRoadmapADO application");
             }            // Retrieve work items from Azure DevOps
+            IEnumerable<WorkItem> workItems;
             if (options.OutputFormat != "summary")
             {
-                if (options.RunHygieneChecks || options.HygieneChecksOnly)
+                if (options.RunHygieneChecks)
                 {
-                    _logger.LogInformation("Retrieving Feature and Release Train work items from Azure DevOps for hygiene checks (limit: {Limit}, area path: {AreaPath})", 
+                    _logger.LogInformation("Retrieving Feature and Release Train work items for hygiene checks (limit: {Limit}, area path: {AreaPath})", 
                         options.Limit, options.AreaPath);
                 }
-                else
+                else if (options.CreateRoadmap)
                 {
-                    _logger.LogInformation("Retrieving Feature work items from Azure DevOps (limit: {Limit}, area path: {AreaPath})", 
+                    _logger.LogInformation("Retrieving Feature work items for roadmap generation (limit: {Limit}, area path: {AreaPath})", 
                         options.Limit, options.AreaPath);
                 }
             }
             
-            IEnumerable<WorkItem> workItems;
-            if (options.RunHygieneChecks || options.HygieneChecksOnly)
+            if (options.RunHygieneChecks)
             {
                 // For hygiene checks, get both Feature and Release Train work items
                 workItems = await _azureDevOpsService.GetWorkItemsForHygieneChecksAsync(options.Limit, options.AreaPath!);
             }
             else
             {
-                // For regular roadmap generation, get only Feature work items
+                // For roadmap generation, get only Feature work items
                 workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit, options.AreaPath!);
-            }            if (!workItems.Any())
+            }if (!workItems.Any())
             {
                 if (options.OutputFormat != "summary")
                 {
                     _logger.LogInformation("No work items found in area path '{AreaPath}'.", options.AreaPath);
                 }
-                
-                string workItemTypeDescription = (options.RunHygieneChecks || options.HygieneChecksOnly) 
+                  string workItemTypeDescription = options.RunHygieneChecks
                     ? "Feature or Release Train work items" 
                     : "Feature work items";
                 Console.WriteLine($"No {workItemTypeDescription} found in area path '{options.AreaPath}'.");
-                return;
-            }// Only show processing messages if not in summary mode
-            if (options.OutputFormat != "summary")
+                return;            }
+
+            // Only show processing messages if not in summary mode and roadmap is requested
+            if (options.OutputFormat != "summary" && options.CreateRoadmap)
             {
                 _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
                 Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
             }
             
-            // Run roadmap generation unless hygiene-only mode
+            // Run roadmap generation if requested
             IEnumerable<CreateRoadmapADO.Models.RoadmapItem> roadmapItems = Enumerable.Empty<CreateRoadmapADO.Models.RoadmapItem>();
-            if (!options.HygieneChecksOnly)
+            if (options.CreateRoadmap)
             {
                 roadmapItems = await _roadmapService.GenerateRoadmapAsync(workItems);
                 
@@ -171,10 +178,8 @@ public class RoadmapApplication
                 
                 // Always display Release Train Summary (this is the main output for summary mode)
                 DisplayReleaseTrainSummary(_roadmapService.OperationsSummary);
-            }
-
-            // Run hygiene checks if requested
-            if (options.RunHygieneChecks || options.HygieneChecksOnly)
+            }            // Run hygiene checks if requested
+            if (options.RunHygieneChecks)
             {
                 if (options.OutputFormat != "summary")
                 {
@@ -188,8 +193,8 @@ public class RoadmapApplication
                 await DisplayHygieneCheckResults(hygieneResults, options);
             }
 
-            // Output roadmap (only if requested and not in hygiene-only mode)
-            if (options.OutputFormat != "summary" && !options.HygieneChecksOnly)
+            // Output roadmap if requested and not in summary mode
+            if (options.OutputFormat != "summary" && options.CreateRoadmap)
             {
                 await OutputRoadmapAsync(roadmapItems, options);
                 _logger.LogInformation("Application completed successfully");
@@ -226,13 +231,11 @@ public class RoadmapApplication
                         options.AreaPath = args[++i];
                     break;                case "--summary-only" or "-s":
                     options.OutputFormat = "summary";
-                    break;
-                case "--hygiene-checks" or "--hygiene":
+                    break;                case "--hygiene-checks" or "--hygiene":
                     options.RunHygieneChecks = true;
                     break;
-                case "--hygiene-only":
-                    options.HygieneChecksOnly = true;
-                    options.RunHygieneChecks = true;
+                case "--create-roadmap" or "--roadmap":
+                    options.CreateRoadmap = true;
                     break;
                 case "--help" or "-h":
                     ShowHelp();
@@ -266,29 +269,37 @@ public class RoadmapApplication
                 break;
         }
     }    private static void ShowHelp()
-    {
-        Console.WriteLine("CreateRoadmapADO - Generate roadmaps from Azure DevOps Feature work items");
+    {        Console.WriteLine("CreateRoadmapADO - Generate roadmaps from Azure DevOps Feature work items");
         Console.WriteLine();
-        Console.WriteLine("Usage: CreateRoadmapADO --area-path <path> [options]");
+        Console.WriteLine("Usage: CreateRoadmapADO --area-path <path> (--hygiene-checks | --create-roadmap) [options]");
         Console.WriteLine();
         Console.WriteLine("Required:");
         Console.WriteLine("  -a, --area-path <path>    Azure DevOps area path to filter work items (e.g., \"SPOOL\\\\Resource Provider\")");
         Console.WriteLine();
+        Console.WriteLine("Operations (at least one required):");
+        Console.WriteLine("  --hygiene-checks          Run ADO hygiene checks on Release Trains and Features");
+        Console.WriteLine("  --create-roadmap          Generate roadmap and create Release Train work items from patterns");
+        Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  -l, --limit <number>      Maximum number of Feature work items to retrieve (default: 100)");
-        Console.WriteLine("  -o, --output <format>     Output format: console, json, csv, summary (default: console)");
-        Console.WriteLine("  -f, --file <path>         Output file path (auto-generated if not specified)");
-        Console.WriteLine("  --hygiene-checks          Run ADO hygiene checks in addition to roadmap generation");
-        Console.WriteLine("  --hygiene-only            Run only ADO hygiene checks (skip roadmap generation)");
+        Console.WriteLine("  -l, --limit <number>      Maximum number of work items to retrieve (default: 100)");
+        Console.WriteLine("  -o, --output <format>     Output format: console, json, csv, summary (default: console)");        Console.WriteLine("  -f, --file <path>         Output file path (auto-generated if not specified)");
         Console.WriteLine("  -h, --help                Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\"");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --limit 50 --output json");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --limit 200 --output csv --file roadmap.csv");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --output summary");
+        Console.WriteLine("  # Create roadmap only");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --create-roadmap");
+        Console.WriteLine();
+        Console.WriteLine("  # Run hygiene checks only");
         Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-checks");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-only");
+        Console.WriteLine();
+        Console.WriteLine("  # Run both operations");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --create-roadmap --hygiene-checks --output summary");
+        Console.WriteLine();
+        Console.WriteLine("  # Export roadmap to JSON");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --create-roadmap --limit 50 --output json");
+        Console.WriteLine();
+        Console.WriteLine("  # Export hygiene results to file");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-checks --file hygiene-report.json");
     }
 
     /// <summary>
@@ -417,5 +428,5 @@ public class CommandLineOptions
     public string? OutputFile { get; set; }
     public string? AreaPath { get; set; }
     public bool RunHygieneChecks { get; set; } = false;
-    public bool HygieneChecksOnly { get; set; } = false;
+    public bool CreateRoadmap { get; set; } = false;
 }
