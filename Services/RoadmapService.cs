@@ -8,7 +8,7 @@ namespace CreateRoadmapADO.Services;
 /// <summary>
 /// Service for generating and managing roadmaps from work items
 /// </summary>
-public class RoadmapService : IRoadmapService
+public class RoadmapService
 {
     private readonly ILogger<RoadmapService> _logger;
     private readonly IAzureDevOpsService _azureDevOpsService;

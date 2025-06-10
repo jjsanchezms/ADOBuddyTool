@@ -8,10 +8,10 @@ This application connects to Azure DevOps, retrieves Feature work items, process
 
 ## Architecture
 
-The application follows SOLID principles with a clean architecture:
+The application follows clean architecture principles with a simplified structure:
 
 - **Models/**: Domain models (WorkItem, RoadmapItem, ReleaseTrainSummary)
-- **Interfaces/**: Service contracts (IAzureDevOpsService, IRoadmapService, IOutputService)
+- **Interfaces/**: Service contracts (IAzureDevOpsService for testability)
 - **Services/**: Service implementations with Release Train creation logic
 - **Configuration/**: Configuration classes (AzureDevOpsOptions, AppOptions)
 
@@ -113,7 +113,7 @@ dotnet run -- --limit 50 --output json
 - **Multiple Output Formats**: Console display, JSON export, CSV export, summary-only mode
 - **Roadmap Generation**: Converts work items to roadmap items with timeline estimation
 - **Operation Tracking**: Provides detailed summary of Release Train creation and update operations
-- **Dependency Injection**: Uses Microsoft.Extensions.DependencyInjection
+- **Simplified Architecture**: Clean separation of concerns without over-engineering
 - **Configuration Management**: Uses Microsoft.Extensions.Configuration
 - **Logging**: Comprehensive logging with Microsoft.Extensions.Logging
 
@@ -186,9 +186,8 @@ The application includes comprehensive error handling:
 
 ## Contributing
 
-This application follows SOLID principles:
-- **S**ingle Responsibility: Each service has a single, well-defined purpose
-- **O**pen/Closed: Services are open for extension but closed for modification
-- **L**iskov Substitution: Implementations can be substituted via interfaces
-- **I**nterface Segregation: Small, focused interfaces
-- **D**ependency Inversion: Depends on abstractions, not concretions
+This application follows clean architecture principles:
+- **Separation of Concerns**: Each service has a focused responsibility
+- **Maintainability**: Simple, straightforward code structure
+- **Testability**: Core Azure DevOps service remains interfaced for testing
+- **Simplicity**: Avoids over-engineering while maintaining code quality

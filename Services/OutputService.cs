@@ -1,4 +1,3 @@
-using CreateRoadmapADO.Interfaces;
 using CreateRoadmapADO.Models;
 using Microsoft.Extensions.Logging;
 using System.Text;
@@ -9,7 +8,7 @@ namespace CreateRoadmapADO.Services;
 /// <summary>
 /// Service for output generation in various formats
 /// </summary>
-public class OutputService : IOutputService
+public class OutputService
 {
     private readonly ILogger<OutputService> _logger;
     private readonly JsonSerializerOptions _jsonOptions;

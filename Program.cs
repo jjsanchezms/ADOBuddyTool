@@ -27,12 +27,10 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddHttpClient<IAzureDevOpsService, AzureDevOpsService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
-        });
-
-        // Services
+        });        // Services
         services.AddScoped<IAzureDevOpsService, AzureDevOpsService>();
-        services.AddScoped<IRoadmapService, RoadmapService>();
-        services.AddScoped<IOutputService, OutputService>();
+        services.AddScoped<RoadmapService>();
+        services.AddScoped<OutputService>();
         services.AddScoped<RoadmapApplication>();
 
         // Logging
@@ -63,14 +61,14 @@ catch (Exception ex)
 public class RoadmapApplication
 {
     private readonly IAzureDevOpsService _azureDevOpsService;
-    private readonly IRoadmapService _roadmapService;
-    private readonly IOutputService _outputService;
+    private readonly RoadmapService _roadmapService;
+    private readonly OutputService _outputService;
     private readonly ILogger<RoadmapApplication> _logger;
 
     public RoadmapApplication(
         IAzureDevOpsService azureDevOpsService,
-        IRoadmapService roadmapService,
-        IOutputService outputService,
+        RoadmapService roadmapService,
+        OutputService outputService,
         ILogger<RoadmapApplication> logger)
     {
         _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
