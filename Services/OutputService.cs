@@ -101,9 +101,6 @@ public class OutputService : IOutputService
             var items = roadmapItems.ToList();
             _logger.LogInformation("Displaying {Count} roadmap items in console", items.Count);
 
-            Console.WriteLine();
-            Console.WriteLine("=== ROADMAP (Sorted by StackRank) ===");
-            Console.WriteLine();
 
             if (!items.Any())
             {
