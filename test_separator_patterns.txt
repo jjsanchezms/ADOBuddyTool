@@ -1,0 +1,17 @@
+Test examples for separator pattern detection:
+
+Should be detected as separators (IsSeparatorPattern = true):
+- "----------------------------- CY25 -----------------------------"
+- "%%%%%%%% Q1 FY25 %%%%%%%%"
+- "---- Sprint Planning ----"
+- "%%%%%%% 2025 %%%%%%%"
+- "--------%%%%--------"
+
+Should NOT be detected as separators (IsSeparatorPattern = false):
+- "Feature - User Authentication"
+- "Release Train Alpha"
+- "Q1-2025 Planning Initiative"
+- "CY25 Budget Approval Process"
+- "Sprint-1 Development Tasks"
+
+The algorithm checks if more than 60% of the title consists of dashes (-) or percent signs (%).

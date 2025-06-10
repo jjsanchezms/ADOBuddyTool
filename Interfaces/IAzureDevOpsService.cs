@@ -22,6 +22,25 @@ public interface IAzureDevOpsService : IDisposable
     Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, string areaPath, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Retrieves work items from Azure DevOps with limit and work item type
+    /// </summary>
+    /// <param name="limit">Maximum number of work items to retrieve</param>
+    /// <param name="areaPath">Area path to filter work items</param>
+    /// <param name="workItemType">Type of work items to retrieve (e.g., 'Feature', 'Release Train')</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Collection of work items of the specified type</returns>
+    Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, string areaPath, string workItemType, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves both Feature and Release Train work items for hygiene checks
+    /// </summary>
+    /// <param name="limit">Maximum number of work items to retrieve</param>
+    /// <param name="areaPath">Area path to filter work items</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Collection of Feature and Release Train work items</returns>
+    Task<IEnumerable<WorkItem>> GetWorkItemsForHygieneChecksAsync(int limit, string areaPath, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves a specific work item by ID
     /// </summary>
     /// <param name="workItemId">Work item ID</param>

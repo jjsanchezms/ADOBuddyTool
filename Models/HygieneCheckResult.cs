@@ -33,12 +33,15 @@ public class HygieneCheckResult
     /// <summary>
     /// Work item ID this check applies to
     /// </summary>
-    public int WorkItemId { get; set; }
-
-    /// <summary>
+    public int WorkItemId { get; set; }    /// <summary>
     /// Work item title for context
     /// </summary>
     public string WorkItemTitle { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Direct URL to the work item in Azure DevOps
+    /// </summary>
+    public string WorkItemUrl { get; set; } = string.Empty;
 
     /// <summary>
     /// Recommendations for fixing the issue
