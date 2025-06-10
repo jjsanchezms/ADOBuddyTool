@@ -36,10 +36,8 @@ public class HygieneCheckResult
     public int WorkItemId { get; set; }    /// <summary>
     /// Work item title for context
     /// </summary>
-    public string WorkItemTitle { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Azure DevOps URL to the work item
+    public string WorkItemTitle { get; set; } = string.Empty;    /// <summary>
+    /// Direct URL to the work item in Azure DevOps
     /// </summary>
     public string WorkItemUrl { get; set; } = string.Empty;
 

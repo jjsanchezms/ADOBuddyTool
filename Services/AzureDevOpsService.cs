@@ -48,14 +48,16 @@ public class AzureDevOpsService : IAzureDevOpsService
     {
         // Default to the legacy area path for backward compatibility
         return await GetWorkItemsAsync(1000, "SPOOL\\Resource Provider", cancellationToken);
+    }    public async Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, string areaPath, CancellationToken cancellationToken = default)
+    {
+        // Default to Feature work items for backward compatibility
+        return await GetWorkItemsAsync(limit, areaPath, "Feature", cancellationToken);
     }
 
-    public async Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, string areaPath, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, string areaPath, string workItemType, CancellationToken cancellationToken = default)
     {
         try
         {
-            const string workItemType = "Feature"; // Hardcoded to only retrieve Features
-
             // WIQL query to retrieve work items ordered by BacklogPriority, filtered by AreaPath, excluding Removed state and KTLO tasks
             var wiqlQuery = $"SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] = '{workItemType}' AND [System.AreaPath] UNDER '{areaPath}' AND [System.State] NOT IN ('Removed','Closed') AND NOT [System.Tags] CONTAINS 'WeeklyDeploymentTasks' ORDER BY [Microsoft.VSTS.Common.StackRank] ASC, [System.Id] ASC";
             var workItemIds = await ExecuteWiqlQueryAsync(wiqlQuery, cancellationToken);
@@ -65,19 +67,16 @@ public class AzureDevOpsService : IAzureDevOpsService
 
             if (!limitedIds.Any())
             {
-                _logger.LogInformation("No Feature work items found.");
+                _logger.LogInformation("No {WorkItemType} work items found.", workItemType);
                 return Enumerable.Empty<WorkItem>();
             }
 
-            _logger.LogInformation("Found {Count} Feature work items, retrieving {Limit}", workItemIds.Count(), limitedIds.Count());
-
-            // Get the full work item details for the limited set
+            _logger.LogInformation("Found {Count} {WorkItemType} work items, retrieving {Limit}", workItemIds.Count(), workItemType, limitedIds.Count());            // Get the full work item details for the limited set
             return await GetWorkItemsByIdsAsync(limitedIds, cancellationToken);
         }        catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving Feature work items");
-            throw;
-        }
+            _logger.LogError(ex, "Error retrieving {WorkItemType} work items", workItemType);
+            throw;        }
     }
 
     public async Task<IEnumerable<WorkItem>> GetWorkItemsForHygieneChecksAsync(int limit, string areaPath, CancellationToken cancellationToken = default)
@@ -94,18 +93,22 @@ public class AzureDevOpsService : IAzureDevOpsService
             if (!limitedIds.Any())
             {
                 _logger.LogInformation("No Feature or Release Train work items found for hygiene checks.");
-                return Enumerable.Empty<WorkItem>();
-            }            _logger.LogInformation("Found {Count} Feature/Release Train work items for hygiene checks, retrieving {Limit}", workItemIds.Count(), limitedIds.Count());
+            return Enumerable.Empty<WorkItem>();
+            }
 
-            // Get the full work item details for hygiene checks
-            return await GetWorkItemsByIdsAsync(limitedIds, cancellationToken);
+            _logger.LogInformation("Found {Count} Feature/Release Train work items for hygiene checks, retrieving {Limit}", workItemIds.Count(), limitedIds.Count());
+
+            // Get the full work item details with relations for hygiene checks
+            return await GetWorkItemsWithRelationsByIdsAsync(limitedIds, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving work items for hygiene checks");
             throw;
         }
-    }public async Task<WorkItem?> GetWorkItemByIdAsync(int workItemId, CancellationToken cancellationToken = default)
+    }
+
+    public async Task<WorkItem?> GetWorkItemByIdAsync(int workItemId, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -613,6 +616,24 @@ public class AzureDevOpsService : IAzureDevOpsService
             _logger.LogError(ex, "Error updating work item #{WorkItemId} title", workItemId);
             throw;
         }
+    }
+
+    private async Task<IEnumerable<WorkItem>> GetWorkItemsWithRelationsByIdsAsync(IEnumerable<int> workItemIds, CancellationToken cancellationToken)
+    {
+        // For hygiene checks, we need to get each work item individually with relations
+        // since the batch API doesn't support expanding relations for multiple items
+        var workItems = new List<WorkItem>();
+        
+        foreach (var id in workItemIds)
+        {
+            var workItem = await GetWorkItemWithRelationsAsync(id, cancellationToken);
+            if (workItem != null)
+            {
+                workItems.Add(workItem);
+            }
+        }
+        
+        return workItems;
     }
 }
 
