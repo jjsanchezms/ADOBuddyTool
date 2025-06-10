@@ -5,22 +5,21 @@ namespace CreateRoadmapADO.Interfaces;
 /// <summary>
 /// Interface for Azure DevOps API operations
 /// </summary>
-public interface IAzureDevOpsService
+public interface IAzureDevOpsService : IDisposable
 {
     /// <summary>
     /// Retrieves Feature work items from Azure DevOps
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of Feature work items</returns>
-    Task<IEnumerable<WorkItem>> GetWorkItemsAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
+    Task<IEnumerable<WorkItem>> GetWorkItemsAsync(CancellationToken cancellationToken = default);    /// <summary>
     /// Retrieves Feature work items from Azure DevOps with limit
     /// </summary>
     /// <param name="limit">Maximum number of work items to retrieve</param>
+    /// <param name="areaPath">Area path to filter work items</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of Feature work items</returns>
-    Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, CancellationToken cancellationToken = default);
+    Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, string areaPath, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a specific work item by ID

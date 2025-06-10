@@ -1,56 +1,41 @@
-﻿using CreateRoadmapADO.Configuration;
+using CreateRoadmapADO.Configuration;
 using CreateRoadmapADO.Interfaces;
 using CreateRoadmapADO.Models;
 using CreateRoadmapADO.Services;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-// Build configuration
-var builder = new ConfigurationBuilder()
-    .SetBasePath(Directory.GetCurrentDirectory())
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-    .AddEnvironmentVariables();
-
-var configuration = builder.Build();
-
-// Build host with dependency injection
-var host = Host.CreateDefaultBuilder(args)
-    .ConfigureServices((context, services) =>
-    {
-        // Configuration
-        services.Configure<AzureDevOpsOptions>(configuration.GetSection(AzureDevOpsOptions.SectionName));
-        services.Configure<AppOptions>(configuration.GetSection("App"));
-
-        // HttpClient
-        services.AddHttpClient<IAzureDevOpsService, AzureDevOpsService>(client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(30);
-        });        // Services
-        services.AddScoped<IAzureDevOpsService, AzureDevOpsService>();
-        services.AddScoped<RoadmapService>();
-        services.AddScoped<OutputService>();
-        services.AddScoped<RoadmapApplication>();
-
-        // Logging
-        services.AddLogging(builder =>
-        {
-            builder.AddConsole();
-            builder.AddConfiguration(configuration.GetSection("Logging"));
-        });
-    })
-    .Build();
+// Setup logging
+using var loggerFactory = LoggerFactory.Create(builder =>
+{
+    builder.AddConsole();
+    builder.SetMinimumLevel(LogLevel.Information);
+});
 
 try
 {
-    // Run the application
-    var app = host.Services.GetRequiredService<RoadmapApplication>();
+    // Create logger for the application
+    var logger = loggerFactory.CreateLogger<RoadmapApplication>();
+    
+    // Create services with simple constructor injection
+    var azureDevOpsLogger = loggerFactory.CreateLogger<AzureDevOpsService>();
+    var azureDevOpsService = new AzureDevOpsService(azureDevOpsLogger);
+    
+    var roadmapLogger = loggerFactory.CreateLogger<RoadmapService>();
+    var roadmapService = new RoadmapService(roadmapLogger, azureDevOpsService);
+    
+    var outputLogger = loggerFactory.CreateLogger<OutputService>();
+    var outputService = new OutputService(outputLogger);
+    
+    // Create and run the application
+    var app = new RoadmapApplication(azureDevOpsService, roadmapService, outputService, logger);
     await app.RunAsync(args);
+    
+    // Cleanup
+    azureDevOpsService.Dispose();
 }
 catch (Exception ex)
 {
-    var logger = host.Services.GetRequiredService<ILogger<Program>>();
+    var logger = loggerFactory.CreateLogger<Program>();
     logger.LogCritical(ex, "Application terminated unexpectedly");
     Environment.Exit(1);
 }
@@ -75,24 +60,35 @@ public class RoadmapApplication
         _roadmapService = roadmapService ?? throw new ArgumentNullException(nameof(roadmapService));
         _outputService = outputService ?? throw new ArgumentNullException(nameof(outputService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
-    public async Task RunAsync(string[] args)
+    }    public async Task RunAsync(string[] args)
     {
         try
         {
             _logger.LogInformation("Starting CreateRoadmapADO application");
 
             // Parse command line arguments
-            var options = ParseArguments(args);            // Retrieve work items from Azure DevOps
-            _logger.LogInformation("Retrieving Feature work items from Azure DevOps (limit: {Limit})", options.Limit);
-            var workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit);
+            var options = ParseArguments(args);
+
+            // Validate required parameters
+            if (string.IsNullOrWhiteSpace(options.AreaPath))
+            {
+                Console.WriteLine("Error: Area path is required.");
+                Console.WriteLine();
+                ShowHelp();
+                return;
+            }            // Retrieve work items from Azure DevOps
+            _logger.LogInformation("Retrieving Feature work items from Azure DevOps (limit: {Limit}, area path: {AreaPath})", 
+                options.Limit, options.AreaPath);
+            var workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit, options.AreaPath!);
 
             if (!workItems.Any())
             {
-                _logger.LogInformation("No work items found.");
+                _logger.LogInformation("No work items found in area path '{AreaPath}'.", options.AreaPath);
+                Console.WriteLine($"No Feature work items found in area path '{options.AreaPath}'.");
                 return;
-            }            _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
+            }
+
+            _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
             Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
             var roadmapItems = await _roadmapService.GenerateRoadmapAsync(workItems);
             Console.WriteLine("\nFinished processing special title patterns\n");
@@ -116,10 +112,13 @@ public class RoadmapApplication
         }
     }    private static CommandLineOptions ParseArguments(string[] args)
     {
-        var options = new CommandLineOptions();        for (int i = 0; i < args.Length; i++)
+        var options = new CommandLineOptions();
+
+        for (int i = 0; i < args.Length; i++)
         {
             switch (args[i].ToLowerInvariant())
-            {                case "--output" or "-o":
+            {
+                case "--output" or "-o":
                     if (i + 1 < args.Length)
                         options.OutputFormat = args[++i];
                     break;
@@ -130,6 +129,10 @@ public class RoadmapApplication
                 case "--limit" or "-l":
                     if (i + 1 < args.Length && int.TryParse(args[++i], out var limit))
                         options.Limit = limit;
+                    break;
+                case "--area-path" or "-a":
+                    if (i + 1 < args.Length)
+                        options.AreaPath = args[++i];
                     break;
                 case "--summary-only" or "-s":
                     options.OutputFormat = "summary";
@@ -169,19 +172,25 @@ public class RoadmapApplication
     {
         Console.WriteLine("CreateRoadmapADO - Generate roadmaps from Azure DevOps Feature work items");
         Console.WriteLine();
-        Console.WriteLine("Usage: CreateRoadmapADO [options]");
+        Console.WriteLine("Usage: CreateRoadmapADO --area-path <path> [options]");
+        Console.WriteLine();
+        Console.WriteLine("Required:");
+        Console.WriteLine("  -a, --area-path <path>    Azure DevOps area path to filter work items (e.g., \"SPOOL\\\\Resource Provider\")");
         Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  -l, --limit <number>  Maximum number of Feature work items to retrieve (default: 100)");
-        Console.WriteLine("  -o, --output <format> Output format: console, json, csv (default: console)");
-        Console.WriteLine("  -f, --file <path>     Output file path (auto-generated if not specified)");
-        Console.WriteLine("  -h, --help            Show this help message");
+        Console.WriteLine("  -l, --limit <number>      Maximum number of Feature work items to retrieve (default: 100)");
+        Console.WriteLine("  -o, --output <format>     Output format: console, json, csv, summary (default: console)");
+        Console.WriteLine("  -f, --file <path>         Output file path (auto-generated if not specified)");
+        Console.WriteLine("  -h, --help                Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
-        Console.WriteLine("  CreateRoadmapADO");
-        Console.WriteLine("  CreateRoadmapADO --limit 50 --output json");
-        Console.WriteLine("  CreateRoadmapADO --limit 200 --output csv --file roadmap.csv");
-    }    /// <summary>
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\"");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --limit 50 --output json");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --limit 200 --output csv --file roadmap.csv");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --output summary");
+    }
+
+    /// <summary>
     /// Displays a summary of Release Train operations
     /// </summary>
     /// <param name="summary">The operations summary to display</param>
@@ -247,4 +256,5 @@ public class CommandLineOptions
     public int Limit { get; set; } = 100;
     public string OutputFormat { get; set; } = "console";
     public string? OutputFile { get; set; }
+    public string? AreaPath { get; set; }
 }

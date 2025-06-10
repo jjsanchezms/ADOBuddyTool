@@ -4,7 +4,7 @@ A C# .NET 8 console application that generates roadmaps from Azure DevOps Featur
 
 ## Overview
 
-This application connects to Azure DevOps, retrieves Feature work items, processes special title patterns to create Release Trains, and generates roadmaps that can be exported to JSON, CSV, or displayed in the console.
+This application connects to Azure DevOps, retrieves Feature work items from a specified area path, processes special title patterns to create Release Trains, and generates roadmaps that can be exported to JSON, CSV, or displayed in the console.
 
 ## Architecture
 
@@ -63,21 +63,25 @@ This will create a Release Train called "Q1 2024 Release" with Features 2, 3, an
 # Display help
 CreateRoadmapADO --help
 
-# Default usage (Features to console)
-CreateRoadmapADO
+# Basic usage (required area path parameter)
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider"
 
-# Export to JSON with limit
-CreateRoadmapADO --limit 50 --output json
+# With custom area path and limit
+CreateRoadmapADO --area-path "MyProject\\MyTeam" --limit 50
+
+# Export to JSON with custom area path
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --limit 50 --output json
 
 # Export to CSV with custom filename
-CreateRoadmapADO --limit 200 --output csv --file my-roadmap.csv
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --limit 200 --output csv --file my-roadmap.csv
 
 # Show only Release Train creation summary
-CreateRoadmapADO --output summary
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --output summary
 ```
 
 ### Options
 
+- `-a, --area-path <path>`: **[REQUIRED]** Azure DevOps area path to filter work items (e.g., "SPOOL\\Resource Provider")
 - `-l, --limit <number>`: Maximum number of Feature work items to retrieve (default: 100)
 - `-o, --output <format>`: Output format: console, json, csv, summary (default: console)
 - `-f, --file <path>`: Output file path (auto-generated if not specified)
@@ -99,15 +103,16 @@ dotnet build
 ### Run
 
 ```bash
-dotnet run
+dotnet run -- --area-path "SPOOL\\Resource Provider"
 
-# Or with arguments
-dotnet run -- --limit 50 --output json
+# Or with additional arguments
+dotnet run -- --area-path "MyProject\\MyTeam" --limit 50 --output json
 ```
 
 ## Features
 
 - **Azure DevOps Integration**: Connects to Azure DevOps REST API
+- **Configurable Area Path**: Filter work items by specifying the Azure DevOps area path
 - **Release Train Creation**: Automatically creates Release Train work items from special title patterns
 - **Pattern Processing**: Recognizes title patterns like `----- Title -----rt` to group features into release trains
 - **Multiple Output Formats**: Console display, JSON export, CSV export, summary-only mode
@@ -168,6 +173,7 @@ Cancelled: 2
 ## Error Handling
 
 The application includes comprehensive error handling:
+- **Required Parameter Validation**: Ensures area path is provided before execution
 - Configuration validation
 - HTTP request timeouts
 - API error responses for both reading and creating work items
@@ -177,11 +183,10 @@ The application includes comprehensive error handling:
 
 ## Dependencies
 
-- Microsoft.Extensions.DependencyInjection
 - Microsoft.Extensions.Configuration
-- Microsoft.Extensions.Hosting
+- Microsoft.Extensions.Configuration.Json
 - Microsoft.Extensions.Logging
-- Microsoft.Extensions.Http
+- Microsoft.Extensions.Logging.Console
 - System.Text.Json
 
 ## Contributing
@@ -191,3 +196,13 @@ This application follows clean architecture principles:
 - **Maintainability**: Simple, straightforward code structure
 - **Testability**: Core Azure DevOps service remains interfaced for testing
 - **Simplicity**: Avoids over-engineering while maintaining code quality
+
+## Recent Improvements
+
+### v2.0 - Simplified Architecture & Configurable Area Path
+- **Removed Epic Functionality**: Simplified to focus only on Release Train creation
+- **Interface Reduction**: Removed unnecessary interfaces (`IOutputService`, `IRoadmapService`) for simpler codebase
+- **Configurable Area Path**: Added required `--area-path` parameter instead of hardcoded path
+- **Simplified Dependency Injection**: Removed Microsoft.Extensions.Hosting dependency and implemented simple constructor injection
+- **Enhanced Error Handling**: Added validation for required parameters with clear error messages
+- **Updated Documentation**: Comprehensive help and usage examples with new parameter requirements

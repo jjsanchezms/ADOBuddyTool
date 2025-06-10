@@ -2,7 +2,6 @@ using CreateRoadmapADO.Configuration;
 using CreateRoadmapADO.Interfaces;
 using CreateRoadmapADO.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -19,13 +18,9 @@ public class AzureDevOpsService : IAzureDevOpsService
     private readonly ILogger<AzureDevOpsService> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
 
-    public AzureDevOpsService(
-        HttpClient httpClient,
-        IOptions<AzureDevOpsOptions> options,
-        ILogger<AzureDevOpsService> logger)
+    public AzureDevOpsService(ILogger<AzureDevOpsService> logger)
     {
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _options = ConfigurationReader.GetAzureDevOpsOptions();
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         if (!_options.IsValid())
@@ -33,6 +28,7 @@ public class AzureDevOpsService : IAzureDevOpsService
             throw new InvalidOperationException("Azure DevOps configuration is invalid");
         }
 
+        _httpClient = new HttpClient();
         ConfigureHttpClient();
         
         _jsonOptions = new JsonSerializerOptions
@@ -46,21 +42,22 @@ public class AzureDevOpsService : IAzureDevOpsService
     {
         var credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($":{_options.PersonalAccessToken}"));
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-        _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-    }
+        _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));    }
 
     public async Task<IEnumerable<WorkItem>> GetWorkItemsAsync(CancellationToken cancellationToken = default)
     {
-        return await GetWorkItemsAsync(1000, cancellationToken);
+        // Default to the legacy area path for backward compatibility
+        return await GetWorkItemsAsync(1000, "SPOOL\\Resource Provider", cancellationToken);
     }
 
-    public async Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, string areaPath, CancellationToken cancellationToken = default)
     {
         try
-        {            const string workItemType = "Feature"; // Hardcoded to only retrieve Features
+        {
+            const string workItemType = "Feature"; // Hardcoded to only retrieve Features
 
             // WIQL query to retrieve work items ordered by BacklogPriority, filtered by AreaPath, excluding Removed state and KTLO tasks
-            var wiqlQuery = $"SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] = '{workItemType}' AND [System.AreaPath] UNDER 'SPOOL\\Resource Provider' AND [System.State] NOT IN ('Removed','Closed') AND NOT [System.Tags] CONTAINS 'WeeklyDeploymentTasks' ORDER BY [Microsoft.VSTS.Common.StackRank] ASC, [System.Id] ASC";
+            var wiqlQuery = $"SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] = '{workItemType}' AND [System.AreaPath] UNDER '{areaPath}' AND [System.State] NOT IN ('Removed','Closed') AND NOT [System.Tags] CONTAINS 'WeeklyDeploymentTasks' ORDER BY [Microsoft.VSTS.Common.StackRank] ASC, [System.Id] ASC";
             var workItemIds = await ExecuteWiqlQueryAsync(wiqlQuery, cancellationToken);
 
             // Take only the requested number of IDs
@@ -282,8 +279,7 @@ public class AzureDevOpsService : IAzureDevOpsService
             throw;
         }
     }
-    
-    public async Task CreateRelationAsync(int sourceId, int targetId, string comment = "")
+      public async Task CreateRelationAsync(int sourceId, int targetId, string comment = "")
     {
         try
         {
@@ -329,6 +325,11 @@ public class AzureDevOpsService : IAzureDevOpsService
             _logger.LogError(ex, "Error creating relation from #{SourceId} to #{TargetId}", sourceId, targetId);
             throw;
         }
+    }
+
+    public void Dispose()
+    {
+        _httpClient?.Dispose();
     }
 
     private async Task<IEnumerable<int>> ExecuteWiqlQueryAsync(string wiqlQuery, CancellationToken cancellationToken)
