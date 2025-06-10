@@ -6,6 +6,7 @@ Should be detected as separators (IsSeparatorPattern = true):
 - "---- Sprint Planning ----"
 - "%%%%%%% 2025 %%%%%%%"
 - "--------%%%%--------"
+- "--------------------- CY25H2 End ---------------------"
 
 Should NOT be detected as separators (IsSeparatorPattern = false):
 - "Feature - User Authentication"

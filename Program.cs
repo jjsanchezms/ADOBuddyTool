@@ -2,6 +2,7 @@ using CreateRoadmapADO.Configuration;
 using CreateRoadmapADO.Interfaces;
 using CreateRoadmapADO.Models;
 using CreateRoadmapADO.Services;
+using CreateRoadmapADO.Services.HygieneChecks;
 using Microsoft.Extensions.Logging;
 
 // Parse arguments early to configure logging appropriately
@@ -19,8 +20,7 @@ using var loggerFactory = LoggerFactory.Create(builder =>
 try
 {
     // Create logger for the application
-    var logger = loggerFactory.CreateLogger<RoadmapApplication>();
-      // Create services with simple constructor injection
+    var logger = loggerFactory.CreateLogger<RoadmapApplication>();    // Create services with simple constructor injection
     var azureDevOpsLogger = loggerFactory.CreateLogger<AzureDevOpsService>();
     var azureDevOpsService = new AzureDevOpsService(azureDevOpsLogger);
     
@@ -30,8 +30,30 @@ try
     var outputLogger = loggerFactory.CreateLogger<OutputService>();
     var outputService = new OutputService(outputLogger);
     
+    // Create individual hygiene check instances with their loggers
+    var releaseTrainFeatureCountCheck = new ReleaseTrainFeatureCountCheck(
+        loggerFactory.CreateLogger<ReleaseTrainFeatureCountCheck>());
+    var iterationPathAlignmentCheck = new IterationPathAlignmentCheck(
+        loggerFactory.CreateLogger<IterationPathAlignmentCheck>());
+    var releaseTrainCompletenessCheck = new ReleaseTrainCompletenessCheck(
+        releaseTrainFeatureCountCheck, 
+        iterationPathAlignmentCheck,
+        loggerFactory.CreateLogger<ReleaseTrainCompletenessCheck>());
+    var statusNotesDocumentationCheck = new StatusNotesDocumentationCheck(
+        loggerFactory.CreateLogger<StatusNotesDocumentationCheck>());
+    var featureStateConsistencyCheck = new FeatureStateConsistencyCheck(
+        loggerFactory.CreateLogger<FeatureStateConsistencyCheck>());
+    var featureReleaseTrainRelationshipCheck = new FeatureReleaseTrainRelationshipCheck(
+        loggerFactory.CreateLogger<FeatureReleaseTrainRelationshipCheck>());
+    
     var hygieneLogger = loggerFactory.CreateLogger<HygieneCheckService>();
-    var hygieneService = new HygieneCheckService(azureDevOpsService, hygieneLogger);
+    var hygieneService = new HygieneCheckService(
+        azureDevOpsService, 
+        hygieneLogger,
+        releaseTrainCompletenessCheck,
+        statusNotesDocumentationCheck,
+        featureStateConsistencyCheck,
+        featureReleaseTrainRelationshipCheck);
       // Create and run the application
     var app = new RoadmapApplication(azureDevOpsService, roadmapService, outputService, hygieneService, logger);
     await app.RunAsync(args);
@@ -365,8 +387,7 @@ public class RoadmapApplication
     /// <param name="hygieneResults">The hygiene check results to display</param>
     /// <param name="options">Command line options for output formatting</param>
     private async Task DisplayHygieneCheckResults(HygieneCheckSummary hygieneResults, CommandLineOptions options)
-    {
-        // Display summary
+    {        // Display summary
         Console.WriteLine();
         Console.WriteLine("HYGIENE CHECK SUMMARY");
         Console.WriteLine("=".PadRight(60, '='));
@@ -381,6 +402,26 @@ public class RoadmapApplication
             Console.WriteLine($"Error Issues: {hygieneResults.ErrorIssues} 🟠");
         if (hygieneResults.WarningIssues > 0)
             Console.WriteLine($"Warning Issues: {hygieneResults.WarningIssues} 🟡");
+        
+        // Display breakdown by check type for failed checks
+        var failedChecksByType = hygieneResults.CheckResults
+            .Where(r => !r.Passed)
+            .GroupBy(r => r.CheckName)
+            .Where(g => g.Any())
+            .ToList();
+
+        if (failedChecksByType.Any())
+        {
+            Console.WriteLine();
+            Console.WriteLine("ISSUES BY CHECK TYPE");
+            Console.WriteLine("-".PadRight(60, '-'));
+            
+            foreach (var checkGroup in failedChecksByType.OrderByDescending(g => g.Count()))
+            {
+                var severityIcon = GetMostSevereIcon(checkGroup);
+                Console.WriteLine($"{severityIcon} {checkGroup.Key}: {checkGroup.Count()} issues");
+            }
+        }
         
         Console.WriteLine();
 
@@ -415,6 +456,23 @@ public class RoadmapApplication
             await _outputService.ExportHygieneCheckResultsAsync(hygieneResults, options.OutputFile);
             Console.WriteLine($"Hygiene check results exported to: {options.OutputFile}");
         }
+    }
+
+    /// <summary>
+    /// Gets the most severe icon for a group of hygiene check results
+    /// </summary>
+    /// <param name="checkGroup">Group of hygiene check results</param>
+    /// <returns>Icon representing the most severe issue in the group</returns>
+    private static string GetMostSevereIcon(IGrouping<string, HygieneCheckResult> checkGroup)
+    {
+        var mostSevere = checkGroup.Max(c => c.Severity);
+        return mostSevere switch
+        {
+            HygieneCheckSeverity.Critical => "🔴",
+            HygieneCheckSeverity.Error => "🟠",
+            HygieneCheckSeverity.Warning => "🟡",
+            _ => "ℹ️"
+        };
     }
 }
 
