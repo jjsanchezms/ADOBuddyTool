@@ -114,15 +114,28 @@ public class RoadmapApplication
             if (options.OutputFormat != "summary")
             {
                 _logger.LogInformation("Starting CreateRoadmapADO application");
-            }
-
-            // Retrieve work items from Azure DevOps
-            if (options.OutputFormat != "summary")
+            }            // Retrieve work items from Azure DevOps
+            IEnumerable<WorkItem> workItems;
+            if (options.HygieneChecksOnly)
             {
-                _logger.LogInformation("Retrieving Feature work items from Azure DevOps (limit: {Limit}, area path: {AreaPath})", 
-                    options.Limit, options.AreaPath);
+                // For hygiene-only mode, get both Feature and Release Train work items
+                if (options.OutputFormat != "summary")
+                {
+                    _logger.LogInformation("Retrieving Feature and Release Train work items for hygiene checks from Azure DevOps (limit: {Limit}, area path: {AreaPath})", 
+                        options.Limit, options.AreaPath);
+                }
+                workItems = await _azureDevOpsService.GetWorkItemsForHygieneChecksAsync(options.Limit, options.AreaPath!);
             }
-            var workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit, options.AreaPath!);            if (!workItems.Any())
+            else
+            {
+                // For roadmap generation, get only Feature work items
+                if (options.OutputFormat != "summary")
+                {
+                    _logger.LogInformation("Retrieving Feature work items from Azure DevOps (limit: {Limit}, area path: {AreaPath})", 
+                        options.Limit, options.AreaPath);
+                }
+                workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit, options.AreaPath!);
+            }if (!workItems.Any())
             {
                 if (options.OutputFormat != "summary")
                 {
@@ -130,8 +143,8 @@ public class RoadmapApplication
                 }
                 Console.WriteLine($"No Feature work items found in area path '{options.AreaPath}'.");
                 return;
-            }            // Only show processing messages if not in summary mode
-            if (options.OutputFormat != "summary")
+            }            // Only show processing messages if not in summary mode and not hygiene-only
+            if (options.OutputFormat != "summary" && !options.HygieneChecksOnly)
             {
                 _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
                 Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
@@ -261,13 +274,19 @@ public class RoadmapApplication
         Console.WriteLine("  --hygiene-only            Run only ADO hygiene checks (skip roadmap generation)");
         Console.WriteLine("  -h, --help                Show this help message");
         Console.WriteLine();
-        Console.WriteLine("Examples:");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\"");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --limit 50 --output json");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --limit 200 --output csv --file roadmap.csv");
+        Console.WriteLine("Most Common Usage (SPOOL Resource Provider):");
+        Console.WriteLine();
+        Console.WriteLine("  # Generate roadmap with minimal output");
         Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --output summary");
+        Console.WriteLine();
+        Console.WriteLine("  # Run hygiene checks with minimal output");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-only --output summary");
+        Console.WriteLine();
+        Console.WriteLine("Additional Examples:");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --limit 50 --output json");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --limit 200 --output csv --file roadmap.csv");
         Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-checks");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-only");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --output summary");
     }
 
     /// <summary>

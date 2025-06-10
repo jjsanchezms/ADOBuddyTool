@@ -1,0 +1,389 @@
+// Enhanced Program.cs with improved command line handling
+// This shows how to integrate the new parameter parsing system
+
+using CreateRoadmapADO.Configuration;
+using CreateRoadmapADO.Interfaces;
+using CreateRoadmapADO.Models;
+using CreateRoadmapADO.Services;
+using Microsoft.Extensions.Logging;
+
+// Parse arguments early to configure logging appropriately
+var earlyParseResult = ParseForLogging(args);
+
+// Setup logging with appropriate level
+using var loggerFactory = LoggerFactory.Create(builder =>
+{
+    builder.AddConsole();
+    var logLevel = earlyParseResult.LogLevel switch
+    {
+        LogVerbosity.Trace => LogLevel.Trace,
+        LogVerbosity.Debug => LogLevel.Debug,
+        LogVerbosity.Information => LogLevel.Information,
+        LogVerbosity.Warning => LogLevel.Warning,
+        LogVerbosity.Error => LogLevel.Error,
+        LogVerbosity.Critical => LogLevel.Critical,
+        _ => LogLevel.Information
+    };
+    builder.SetMinimumLevel(logLevel);
+});
+
+try
+{
+    // Create command line parser
+    var parserLogger = loggerFactory.CreateLogger<CommandLineParser>();
+    var parser = new CommandLineParser(parserLogger);
+    
+    // Parse command line arguments
+    var parseResult = parser.Parse(args);
+    
+    if (parseResult.IsHelp)
+    {
+        CommandLineParser.ShowHelp();
+        return;
+    }
+    
+    if (!parseResult.IsSuccess)
+    {
+        parseResult.DisplayErrors();
+        Environment.Exit(1);
+    }
+    
+    var options = parseResult.Options!;
+    
+    // Create logger for the application
+    var logger = loggerFactory.CreateLogger<RoadmapApplication>();
+    
+    // Create services with dependency injection
+    var azureDevOpsLogger = loggerFactory.CreateLogger<AzureDevOpsService>();
+    var azureDevOpsService = new AzureDevOpsService(azureDevOpsLogger);
+    
+    var roadmapLogger = loggerFactory.CreateLogger<RoadmapService>();
+    var roadmapService = new RoadmapService(roadmapLogger, azureDevOpsService);
+    
+    var outputLogger = loggerFactory.CreateLogger<OutputService>();
+    var outputService = new OutputService(outputLogger);
+    
+    var hygieneLogger = loggerFactory.CreateLogger<HygieneCheckService>();
+    var hygieneService = new HygieneCheckService(azureDevOpsService, hygieneLogger);
+    
+    // Create and run the application
+    var app = new EnhancedRoadmapApplication(
+        azureDevOpsService, 
+        roadmapService, 
+        outputService, 
+        hygieneService, 
+        logger);
+        
+    await app.RunAsync(options);
+    
+    // Cleanup
+    azureDevOpsService.Dispose();
+}
+catch (Exception ex)
+{
+    var logger = loggerFactory.CreateLogger<Program>();
+    logger.LogCritical(ex, "Application terminated unexpectedly");
+    Environment.Exit(1);
+}
+
+/// <summary>
+/// Early parsing for logging configuration only
+/// </summary>
+static (LogVerbosity LogLevel, bool IsQuiet) ParseForLogging(string[] args)
+{
+    var logLevel = LogVerbosity.Information;
+    var isQuiet = false;
+    
+    for (int i = 0; i < args.Length; i++)
+    {
+        switch (args[i].ToLowerInvariant())
+        {
+            case "--verbose" or "-v":
+                logLevel = LogVerbosity.Debug;
+                break;
+            case "--quiet" or "-q":
+                logLevel = LogVerbosity.Error;
+                isQuiet = true;
+                break;
+            case "--log-level":
+                if (i + 1 < args.Length && Enum.TryParse<LogVerbosity>(args[i + 1], true, out var level))
+                {
+                    logLevel = level;
+                }
+                break;
+        }
+    }
+    
+    return (logLevel, isQuiet);
+}
+
+/// <summary>
+/// Enhanced application class that uses the new command line options
+/// </summary>
+public class EnhancedRoadmapApplication
+{
+    private readonly IAzureDevOpsService _azureDevOpsService;
+    private readonly RoadmapService _roadmapService;
+    private readonly OutputService _outputService;
+    private readonly HygieneCheckService _hygieneService;
+    private readonly ILogger<EnhancedRoadmapApplication> _logger;
+
+    public EnhancedRoadmapApplication(
+        IAzureDevOpsService azureDevOpsService,
+        RoadmapService roadmapService,
+        OutputService outputService,
+        HygieneCheckService hygieneService,
+        ILogger<EnhancedRoadmapApplication> logger)
+    {
+        _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
+        _roadmapService = roadmapService ?? throw new ArgumentNullException(nameof(roadmapService));
+        _outputService = outputService ?? throw new ArgumentNullException(nameof(outputService));
+        _hygieneService = hygieneService ?? throw new ArgumentNullException(nameof(hygieneService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task RunAsync(EnhancedCommandLineOptions options)
+    {
+        try
+        {
+            // Show startup message unless in quiet mode
+            if (options.LogLevel != LogVerbosity.Error && options.OutputFormat != OutputFormat.Summary)
+            {
+                _logger.LogInformation("Starting CreateRoadmapADO application");
+                
+                if (options.DryRun)
+                {
+                    Console.WriteLine("🔍 DRY RUN MODE - No changes will be made");
+                    Console.WriteLine();
+                }
+            }
+
+            // Apply timeout setting
+            // TODO: Configure HttpClient timeout based on options.TimeoutSeconds
+
+            // Retrieve work items from Azure DevOps with enhanced filtering
+            if (options.LogLevel != LogVerbosity.Error && options.OutputFormat != OutputFormat.Summary)
+            {
+                _logger.LogInformation("Retrieving work items from Azure DevOps");
+                _logger.LogInformation("Parameters: Area='{AreaPath}', Limit={Limit}, Timeout={Timeout}s", 
+                    options.AreaPath, options.Limit, options.TimeoutSeconds);
+                
+                if (options.WorkItemTypes?.Any() == true)
+                {
+                    _logger.LogInformation("Filtering by work item types: {Types}", 
+                        string.Join(", ", options.WorkItemTypes));
+                }
+                
+                if (options.FromDate.HasValue || options.ToDate.HasValue)
+                {
+                    _logger.LogInformation("Date filter: {FromDate} to {ToDate}", 
+                        options.FromDate?.ToString("yyyy-MM-dd") ?? "any", 
+                        options.ToDate?.ToString("yyyy-MM-dd") ?? "any");
+                }
+            }
+
+            // Get work items (this would need to be enhanced to support the new filtering options)
+            var workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit, options.AreaPath);
+
+            if (!workItems.Any())
+            {
+                if (options.OutputFormat != OutputFormat.Summary)
+                {
+                    _logger.LogInformation("No work items found matching the criteria");
+                }
+                Console.WriteLine($"No Feature work items found in area path '{options.AreaPath}'.");
+                return;
+            }
+
+            // Apply additional filtering if specified
+            workItems = ApplyAdvancedFilters(workItems, options);
+
+            if (options.DryRun)
+            {
+                Console.WriteLine($"📊 Would process {workItems.Count()} work items");
+                DisplayDryRunSummary(workItems, options);
+                return;
+            }
+
+            // Run roadmap generation unless hygiene-only mode
+            IEnumerable<CreateRoadmapADO.Models.RoadmapItem> roadmapItems = Enumerable.Empty<CreateRoadmapADO.Models.RoadmapItem>();
+            if (!options.HygieneChecksOnly)
+            {
+                roadmapItems = await _roadmapService.GenerateRoadmapAsync(workItems);
+                
+                if (options.OutputFormat != OutputFormat.Summary)
+                {
+                    Console.WriteLine("\nFinished processing special title patterns\n");
+                }
+                
+                // Always display Release Train Summary (this is the main output for summary mode)
+                DisplayReleaseTrainSummary(_roadmapService.OperationsSummary, options);
+            }
+
+            // Run hygiene checks if requested
+            if (options.RunHygieneChecks || options.HygieneChecksOnly)
+            {
+                await RunHygieneChecks(workItems, options);
+            }
+
+            // Output roadmap (only if requested and not in hygiene-only mode)
+            if (options.OutputFormat != OutputFormat.Summary && !options.HygieneChecksOnly)
+            {
+                await OutputRoadmapAsync(roadmapItems, options);
+                _logger.LogInformation("Application completed successfully");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error running application");
+            Console.WriteLine($"❌ Error: {ex.Message}");
+            Environment.Exit(1);
+        }
+    }
+
+    private IEnumerable<WorkItem> ApplyAdvancedFilters(IEnumerable<WorkItem> workItems, EnhancedCommandLineOptions options)
+    {
+        var filtered = workItems;
+
+        // Filter by work item types
+        if (options.WorkItemTypes?.Any() == true)
+        {
+            filtered = filtered.Where(w => options.WorkItemTypes.Contains(w.WorkItemType, StringComparer.OrdinalIgnoreCase));
+        }
+
+        // Filter by work item states
+        if (options.WorkItemStates?.Any() == true)
+        {
+            filtered = filtered.Where(w => options.WorkItemStates.Contains(w.State, StringComparer.OrdinalIgnoreCase));
+        }
+
+        // Filter by date range (this would need ChangedDate property on WorkItem)
+        // if (options.FromDate.HasValue)
+        // {
+        //     filtered = filtered.Where(w => w.ChangedDate >= options.FromDate.Value);
+        // }
+        
+        // if (options.ToDate.HasValue)
+        // {
+        //     filtered = filtered.Where(w => w.ChangedDate <= options.ToDate.Value);
+        // }
+
+        return filtered;
+    }
+
+    private void DisplayDryRunSummary(IEnumerable<WorkItem> workItems, EnhancedCommandLineOptions options)
+    {
+        var items = workItems.ToList();
+        
+        Console.WriteLine("📋 DRY RUN SUMMARY");
+        Console.WriteLine("=".PadRight(50, '='));
+        Console.WriteLine($"Work Items Found: {items.Count}");
+        
+        var byType = items.GroupBy(w => w.WorkItemType).ToDictionary(g => g.Key, g => g.Count());
+        foreach (var type in byType)
+        {
+            Console.WriteLine($"  {type.Key}: {type.Value}");
+        }
+        
+        if (options.RunHygieneChecks || options.HygieneChecksOnly)
+        {
+            var releaseTrains = items.Where(w => w.WorkItemType == "Release Train").Count();
+            Console.WriteLine($"Release Trains for hygiene checks: {releaseTrains}");
+        }
+        
+        if (!options.HygieneChecksOnly)
+        {
+            Console.WriteLine($"Output format: {options.OutputFormat}");
+            if (!string.IsNullOrEmpty(options.OutputFile))
+            {
+                Console.WriteLine($"Output file: {options.OutputFile}");
+            }
+        }
+        
+        Console.WriteLine();
+        Console.WriteLine("💡 Run without --dry-run to execute these operations");
+    }
+
+    private async Task RunHygieneChecks(IEnumerable<WorkItem> workItems, EnhancedCommandLineOptions options)
+    {
+        if (options.LogLevel != LogVerbosity.Error && options.OutputFormat != OutputFormat.Summary)
+        {
+            Console.WriteLine("\n" + "=".PadRight(60, '='));
+            Console.WriteLine("RUNNING ADO HYGIENE CHECKS");
+            Console.WriteLine("=".PadRight(60, '='));
+            _logger.LogInformation("Starting ADO hygiene checks on {Count} work items", workItems.Count());
+        }
+        
+        var hygieneResults = await _hygieneService.PerformHygieneChecksAsync(workItems);
+        await DisplayHygieneCheckResults(hygieneResults, options);
+    }
+
+    private void DisplayReleaseTrainSummary(ReleaseTrainSummary summary, EnhancedCommandLineOptions options)
+    {
+        // Enhanced summary display with logging level awareness
+        if (options.LogLevel == LogVerbosity.Error)
+        {
+            // Only show critical information in quiet mode
+            if (!summary.BacklogReadSuccessfully)
+            {
+                Console.WriteLine("❌ Error reading backlog items");
+            }
+            return;
+        }
+        
+        Console.WriteLine("=".PadRight(60, '='));
+        Console.WriteLine("RELEASE TRAIN SUMMARY");
+        Console.WriteLine("=".PadRight(60, '='));
+        
+        // ... existing summary logic with enhanced formatting
+        // This would be the same as the current implementation but with
+        // awareness of the new options
+    }
+
+    private async Task DisplayHygieneCheckResults(HygieneCheckSummary hygieneResults, EnhancedCommandLineOptions options)
+    {
+        // Enhanced hygiene results display
+        Console.WriteLine();
+        Console.WriteLine("HYGIENE CHECK SUMMARY");
+        Console.WriteLine("=".PadRight(60, '='));
+        Console.WriteLine($"Total Checks: {hygieneResults.TotalChecks}");
+        Console.WriteLine($"Passed: {hygieneResults.PassedChecks} ✅");
+        Console.WriteLine($"Failed: {hygieneResults.FailedChecks} ❌");
+        Console.WriteLine($"Health Score: {hygieneResults.HealthScore:F1}%");
+        
+        // ... existing hygiene display logic
+        
+        // Export to file if requested
+        if (!string.IsNullOrEmpty(options.OutputFile))
+        {
+            await _outputService.ExportHygieneCheckResultsAsync(hygieneResults, options.OutputFile);
+            Console.WriteLine($"Hygiene check results exported to: {options.OutputFile}");
+        }
+    }
+
+    private async Task OutputRoadmapAsync(IEnumerable<CreateRoadmapADO.Models.RoadmapItem> roadmapItems, EnhancedCommandLineOptions options)
+    {
+        // Enhanced output with directory support
+        var outputFile = options.OutputFile;
+        
+        switch (options.OutputFormat)
+        {
+            case OutputFormat.Json:
+                outputFile ??= Path.Combine(options.OutputDirectory, $"roadmap_{DateTime.Now:yyyyMMdd_HHmmss}.json");
+                await _outputService.ExportToJsonAsync(roadmapItems, outputFile);
+                Console.WriteLine($"Roadmap exported to: {outputFile}");
+                break;
+
+            case OutputFormat.Csv:
+                outputFile ??= Path.Combine(options.OutputDirectory, $"roadmap_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                await _outputService.ExportToCsvAsync(roadmapItems, outputFile);
+                Console.WriteLine($"Roadmap exported to: {outputFile}");
+                break;
+
+            case OutputFormat.Console:
+            default:
+                _outputService.DisplayInConsole(roadmapItems);
+                break;
+        }
+    }
+}

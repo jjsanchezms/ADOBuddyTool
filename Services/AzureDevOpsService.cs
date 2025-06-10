@@ -73,13 +73,39 @@ public class AzureDevOpsService : IAzureDevOpsService
 
             // Get the full work item details for the limited set
             return await GetWorkItemsByIdsAsync(limitedIds, cancellationToken);
-        }
-        catch (Exception ex)
+        }        catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving Feature work items");
             throw;
         }
-    }    public async Task<WorkItem?> GetWorkItemByIdAsync(int workItemId, CancellationToken cancellationToken = default)
+    }
+
+    public async Task<IEnumerable<WorkItem>> GetWorkItemsForHygieneChecksAsync(int limit, string areaPath, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // WIQL query to retrieve both Feature and Release Train work items for hygiene checks
+            var wiqlQuery = $"SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] IN ('Feature', 'Release Train') AND [System.AreaPath] UNDER '{areaPath}' AND [System.State] NOT IN ('Removed','Closed') ORDER BY [Microsoft.VSTS.Common.StackRank] ASC, [System.Id] ASC";
+            var workItemIds = await ExecuteWiqlQueryAsync(wiqlQuery, cancellationToken);
+
+            // Take only the requested number of IDs
+            var limitedIds = workItemIds.Take(Math.Min(limit, 1000));
+
+            if (!limitedIds.Any())
+            {
+                _logger.LogInformation("No Feature or Release Train work items found for hygiene checks.");
+                return Enumerable.Empty<WorkItem>();
+            }            _logger.LogInformation("Found {Count} Feature/Release Train work items for hygiene checks, retrieving {Limit}", workItemIds.Count(), limitedIds.Count());
+
+            // Get the full work item details for hygiene checks
+            return await GetWorkItemsByIdsAsync(limitedIds, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving work items for hygiene checks");
+            throw;
+        }
+    }public async Task<WorkItem?> GetWorkItemByIdAsync(int workItemId, CancellationToken cancellationToken = default)
     {
         try
         {

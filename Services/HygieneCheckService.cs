@@ -10,12 +10,35 @@ namespace CreateRoadmapADO.Services;
 public class HygieneCheckService
 {
     private readonly IAzureDevOpsService _azureDevOpsService;
-    private readonly ILogger<HygieneCheckService> _logger;
-
-    public HygieneCheckService(IAzureDevOpsService azureDevOpsService, ILogger<HygieneCheckService> logger)
+    private readonly ILogger<HygieneCheckService> _logger;    public HygieneCheckService(IAzureDevOpsService azureDevOpsService, ILogger<HygieneCheckService> logger)
     {
         _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Determines if a Release Train title follows a separator/placeholder pattern that should be ignored for hygiene checks.
+    /// These are typically formatting elements like "----------------------------- CY25 -----------------------------"
+    /// </summary>
+    /// <param name="title">Release Train title to check</param>
+    /// <returns>True if the title appears to be a separator/placeholder pattern</returns>
+    private static bool IsSeparatorPattern(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return false;
+
+        var cleanTitle = title.Trim();
+        
+        // Check if title contains mostly dashes and/or percent signs with minimal text content
+        // Pattern examples: "-------- CY25 --------", "%%%%% Q1 %%%%%", "--- FY25 ---"
+        var dashCount = cleanTitle.Count(c => c == '-');
+        var percentCount = cleanTitle.Count(c => c == '%');
+        var separatorCount = dashCount + percentCount;
+        
+        // If more than 60% of the title is separators (dashes/percents), consider it a separator pattern
+        var separatorRatio = (double)separatorCount / cleanTitle.Length;
+        
+        return separatorRatio > 0.6;
     }
 
     /// <summary>
@@ -29,18 +52,34 @@ public class HygieneCheckService
         var summary = new HygieneCheckSummary();
         var workItemsList = workItems.ToList();
 
-        _logger.LogInformation("Starting hygiene checks on {Count} work items", workItemsList.Count);
-
-        // Find all Release Trains
-        var releaseTrains = workItemsList.Where(w => w.WorkItemType == "Release Train").ToList();
+        _logger.LogInformation("Starting hygiene checks on {Count} work items", workItemsList.Count);        // Find all Release Trains
+        var allReleaseTrains = workItemsList.Where(w => w.WorkItemType == "Release Train").ToList();
         
-        if (!releaseTrains.Any())
+        if (!allReleaseTrains.Any())
         {
             _logger.LogInformation("No Release Trains found for hygiene checks");
             return summary;
         }
 
-        _logger.LogInformation("Found {Count} Release Trains to check", releaseTrains.Count);
+        // Filter out separator pattern Release Trains
+        var releaseTrains = allReleaseTrains.Where(rt => !IsSeparatorPattern(rt.Title)).ToList();
+        var separatorPatterns = allReleaseTrains.Where(rt => IsSeparatorPattern(rt.Title)).ToList();
+
+        if (separatorPatterns.Any())
+        {
+            _logger.LogInformation("Excluding {Count} separator pattern Release Trains from hygiene checks: {Titles}", 
+                separatorPatterns.Count,
+                string.Join(", ", separatorPatterns.Select(sp => $"'{sp.Title}'")));
+        }
+
+        if (!releaseTrains.Any())
+        {
+            _logger.LogInformation("No non-separator Release Trains found for hygiene checks");
+            return summary;
+        }
+
+        _logger.LogInformation("Found {Count} Release Trains to check (excluded {ExcludedCount} separator patterns)", 
+            releaseTrains.Count, separatorPatterns.Count);
 
         foreach (var releaseTrain in releaseTrains)
         {
