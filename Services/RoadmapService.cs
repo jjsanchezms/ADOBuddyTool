@@ -69,6 +69,7 @@ public class RoadmapService : IRoadmapService
         List<int> currentChildren = new();
         string? currentTitle = null;
         int? currentExistingId = null;
+        int currentPatternItemId = 0;
         bool isCollectingItems = false;
         bool isReleaseTrain = false;
 
@@ -88,12 +89,15 @@ public class RoadmapService : IRoadmapService
                 if (isCollectingItems && currentTitle != null && currentChildren.Any())
                 {
                     _logger.LogInformation("Creating previous group before starting new one");
-                    await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain, currentExistingId);
+                    await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain, currentExistingId, currentPatternItemId);
                     currentChildren.Clear();
                 }
 
                 // Extract new title from between the markers
                 currentTitle = match.Groups[1].Value.Trim();
+                
+                // Store the pattern item ID for later renaming
+                currentPatternItemId = workItem.Id;
                 
                 // Extract existing work item ID if present
                 currentExistingId = null;
@@ -127,7 +131,7 @@ public class RoadmapService : IRoadmapService
                     // End current group
                     if (currentTitle != null && currentChildren.Any())
                     {
-                        await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain, currentExistingId);
+                        await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain, currentExistingId, currentPatternItemId);
                         currentChildren.Clear();
                         isCollectingItems = false;
                     }
@@ -145,20 +149,17 @@ public class RoadmapService : IRoadmapService
         if (isCollectingItems && currentTitle != null && currentChildren.Any())
         {
             _logger.LogInformation("Creating final group at end of processing");
-            await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain, currentExistingId);
+            await CreateItemFromPattern(currentChildren, currentTitle, isReleaseTrain, currentExistingId, currentPatternItemId);
         }
     }
 
     /// <summary>
     /// Creates an Epic or Release Train item from pattern items
     /// </summary>
-    private async Task CreateItemFromPattern(List<int> children, string title, bool isReleaseTrain, int? existingWorkItemId = null)
+    private async Task CreateItemFromPattern(List<int> children, string title, bool isReleaseTrain, int? existingWorkItemId = null, int patternItemId = 0)
     {
         // Create a divider for better console readability
         Console.WriteLine(new string('=', 80));
-        
-        // Get the pattern item which should be the item with the matching pattern
-        int patternItemId = children.FirstOrDefault();
         
         if (existingWorkItemId.HasValue)
         {
@@ -254,20 +255,38 @@ public class RoadmapService : IRoadmapService
                 NewRelationsAdded = children.Count
             });
         }
-        
-        return newWorkItemId;
-    }
-
-    /// <summary>
+          return newWorkItemId;
+    }    /// <summary>
     /// Updates the pattern work item title to include the newly created work item ID
     /// </summary>
     private async Task UpdatePatternItemWithId(int patternItemId, string title, bool isReleaseTrain, int newWorkItemId)
     {
-        var suffix = isReleaseTrain ? "rt" : "e";
-        var newTitle = $"----- {title} -----{suffix}:{newWorkItemId}";
+        // Get the current work item to preserve its original title format
+        var currentWorkItem = await _azureDevOpsService.GetWorkItemByIdAsync(patternItemId);
+        if (currentWorkItem == null)
+        {
+            _logger.LogWarning("Could not retrieve work item #{PatternItemId} to update title", patternItemId);
+            return;
+        }
         
-        _logger.LogInformation("Updating pattern item #{PatternItemId} title to include created work item ID #{NewWorkItemId}", 
-            patternItemId, newWorkItemId);
+        var originalTitle = currentWorkItem.Title;
+        
+        // Check if the title already has an ID (pattern: ends with :number)
+        var newTitle = originalTitle;
+        if (originalTitle.Contains(':'))
+        {
+            // Replace existing ID
+            var colonIndex = originalTitle.LastIndexOf(':');
+            newTitle = originalTitle.Substring(0, colonIndex) + $":{newWorkItemId}";
+        }
+        else
+        {
+            // Append new ID to the original title
+            newTitle = $"{originalTitle}:{newWorkItemId}";
+        }
+        
+        _logger.LogInformation("Updating pattern item #{PatternItemId} title from '{OriginalTitle}' to '{NewTitle}'", 
+            patternItemId, originalTitle, newTitle);
         
         await _azureDevOpsService.UpdateWorkItemTitleAsync(patternItemId, newTitle);
     }
