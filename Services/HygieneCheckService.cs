@@ -89,29 +89,32 @@ public class HygieneCheckService
                 var releaseTrainWithRelations = await _azureDevOpsService.GetWorkItemWithRelationsAsync(releaseTrain.Id, cancellationToken);
                 
                 if (releaseTrainWithRelations?.Relations == null)
-                {
-                    summary.CheckResults.Add(new HygieneCheckResult
+                {                    summary.CheckResults.Add(new HygieneCheckResult
                     {
                         CheckName = "Release Train Relations",
                         Passed = false,
                         Severity = HygieneCheckSeverity.Warning,
-                        Description = "Check if Release Train has related work items",
+                        Description = "Check if Release Train has related or child work items",
                         Details = "No relations found for this Release Train",
                         WorkItemId = releaseTrain.Id,
                         WorkItemTitle = releaseTrain.Title,
-                        Recommendation = "Ensure this Release Train has related Feature work items"
+                        Recommendation = "Ensure this Release Train has related or child Feature work items"
                     });
                     continue;
-                }
+                }                // Get related and child feature IDs
+                var allRelations = releaseTrainWithRelations.Relations.ToList();
+                _logger.LogDebug("Release Train #{Id} has {Count} total relations: {Relations}", 
+                    releaseTrain.Id, allRelations.Count, 
+                    string.Join(", ", allRelations.Select(r => $"{r.Rel}→{r.GetRelatedWorkItemId()}")));
 
-                // Get related feature IDs
                 var relatedFeatureIds = releaseTrainWithRelations.Relations
-                    .Where(r => r.Rel == "System.LinkTypes.Related")
+                    .Where(r => r.Rel == "System.LinkTypes.Related" || r.Rel == "System.LinkTypes.Hierarchy-Forward")
                     .Select(r => r.GetRelatedWorkItemId())
                     .Where(id => id > 0)
                     .ToList();
 
-                // Get the actual feature work items
+                _logger.LogDebug("Release Train #{Id} found {Count} related/child IDs: {Ids}", 
+                    releaseTrain.Id, relatedFeatureIds.Count, string.Join(", ", relatedFeatureIds));                // Get the actual feature work items
                 var relatedFeatures = new List<WorkItem>();
                 foreach (var featureId in relatedFeatureIds)
                 {
@@ -119,8 +122,21 @@ public class HygieneCheckService
                     if (feature != null && feature.WorkItemType == "Feature")
                     {
                         relatedFeatures.Add(feature);
+                        _logger.LogDebug("Added Feature #{Id}: {Title}", feature.Id, feature.Title);
+                    }
+                    else if (feature != null)
+                    {
+                        _logger.LogDebug("Skipped work item #{Id} (type: {Type}): {Title}", 
+                            feature.Id, feature.WorkItemType, feature.Title);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Could not retrieve work item #{Id}", featureId);
                     }
                 }
+
+                _logger.LogInformation("Release Train #{Id} has {Count} related Features", 
+                    releaseTrain.Id, relatedFeatures.Count);
 
                 // Perform specific hygiene checks
                 await CheckIterationPathAlignment(summary, releaseTrainWithRelations, relatedFeatures);

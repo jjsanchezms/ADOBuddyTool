@@ -113,7 +113,7 @@ public class RoadmapApplication
             // Only show startup message if not in summary mode
             if (options.OutputFormat != "summary")
             {
-                _logger.LogInformation("Starting CreateRoadmapADO application");
+        _logger.LogInformation("Starting CreateRoadmapADO application");
             }            // Retrieve work items from Azure DevOps
             IEnumerable<WorkItem> workItems;
             if (options.HygieneChecksOnly)
@@ -361,13 +361,46 @@ public class RoadmapApplication
         Console.WriteLine($"Passed: {hygieneResults.PassedChecks} ✅");
         Console.WriteLine($"Failed: {hygieneResults.FailedChecks} ❌");
         Console.WriteLine($"Health Score: {hygieneResults.HealthScore:F1}%");
-        
-        if (hygieneResults.CriticalIssues > 0)
+          if (hygieneResults.CriticalIssues > 0)
             Console.WriteLine($"Critical Issues: {hygieneResults.CriticalIssues} 🔴");
         if (hygieneResults.ErrorIssues > 0)
             Console.WriteLine($"Error Issues: {hygieneResults.ErrorIssues} 🟠");
         if (hygieneResults.WarningIssues > 0)
             Console.WriteLine($"Warning Issues: {hygieneResults.WarningIssues} 🟡");
+        
+        // Display detailed breakdown of issues by type
+        if (hygieneResults.ErrorIssues > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"Error Issues: {hygieneResults.ErrorIssues} 🟠");
+            var errorPatterns = hygieneResults.GetIssuePatternSummary(HygieneCheckSeverity.Error);
+            foreach (var pattern in errorPatterns)
+            {
+                Console.WriteLine($"  - {pattern.Key}: {pattern.Value} 🟠");
+            }
+        }
+
+        if (hygieneResults.WarningIssues > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"Warning Issues: {hygieneResults.WarningIssues} 🟡");
+            var warningPatterns = hygieneResults.GetIssuePatternSummary(HygieneCheckSeverity.Warning);
+            foreach (var pattern in warningPatterns)
+            {
+                Console.WriteLine($"  - {pattern.Key}: {pattern.Value} 🟡");
+            }
+        }
+
+        if (hygieneResults.CriticalIssues > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"Critical Issues: {hygieneResults.CriticalIssues} 🔴");
+            var criticalPatterns = hygieneResults.GetIssuePatternSummary(HygieneCheckSeverity.Critical);
+            foreach (var pattern in criticalPatterns)
+            {
+                Console.WriteLine($"  - {pattern.Key}: {pattern.Value} 🔴");
+            }
+        }
         
         Console.WriteLine();
 

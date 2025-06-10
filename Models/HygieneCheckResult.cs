@@ -101,4 +101,86 @@ public class HygieneCheckSummary
     /// Overall health score (percentage of passed checks)
     /// </summary>
     public double HealthScore => TotalChecks > 0 ? (double)PassedChecks / TotalChecks * 100 : 0;
+
+    /// <summary>
+    /// Gets a breakdown of failed checks grouped by check name and severity
+    /// </summary>
+    /// <returns>Dictionary with severity levels and their issue breakdowns</returns>
+    public Dictionary<HygieneCheckSeverity, Dictionary<string, List<HygieneCheckResult>>> GetIssueBreakdown()
+    {
+        var breakdown = new Dictionary<HygieneCheckSeverity, Dictionary<string, List<HygieneCheckResult>>>();
+        
+        var failedChecks = CheckResults.Where(r => !r.Passed).ToList();
+        
+        foreach (var severity in Enum.GetValues<HygieneCheckSeverity>())
+        {
+            var severityChecks = failedChecks.Where(r => r.Severity == severity).ToList();
+            if (severityChecks.Any())
+            {
+                breakdown[severity] = severityChecks
+                    .GroupBy(r => r.CheckName)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+            }
+        }
+        
+        return breakdown;
+    }
+
+    /// <summary>
+    /// Gets a summary of issues by type for a specific severity level
+    /// </summary>
+    /// <param name="severity">The severity level to filter by</param>
+    /// <returns>Dictionary with check names and their counts</returns>
+    public Dictionary<string, int> GetIssueSummaryBySeverity(HygieneCheckSeverity severity)
+    {
+        return CheckResults
+            .Where(r => !r.Passed && r.Severity == severity)
+            .GroupBy(r => r.CheckName)
+            .ToDictionary(g => g.Key, g => g.Count());
+    }
+
+    /// <summary>
+    /// Gets issues grouped by a common pattern in the details (for summary categorization)
+    /// </summary>
+    /// <param name="severity">The severity level to filter by</param>
+    /// <returns>Dictionary with issue patterns and their counts</returns>
+    public Dictionary<string, int> GetIssuePatternSummary(HygieneCheckSeverity severity)
+    {
+        var issues = CheckResults.Where(r => !r.Passed && r.Severity == severity).ToList();
+        var patterns = new Dictionary<string, int>();
+
+        foreach (var issue in issues)
+        {
+            var pattern = GetIssuePattern(issue);
+            patterns[pattern] = patterns.GetValueOrDefault(pattern, 0) + 1;
+        }
+
+        return patterns.OrderByDescending(kvp => kvp.Value).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+    }
+
+    /// <summary>
+    /// Extracts a pattern description from a hygiene check result for categorization
+    /// </summary>
+    private static string GetIssuePattern(HygieneCheckResult result)
+    {
+        var checkName = result.CheckName;
+        var details = result.Details?.ToLowerInvariant() ?? "";
+
+        return checkName switch
+        {
+            "Status Notes Currency" when details.Contains("no description") => "No description provided",
+            "Status Notes Currency" when details.Contains("description present") => "Description too short",
+            "Release Train Completeness" when details.Contains("0 related features") => "No related features",
+            "Release Train Completeness" when details.Contains("related features") => "Insufficient features",
+            "Release Train Tagging" when details.Contains("no tags") => "No tags found",
+            "Release Train Tagging" when details.Contains("tags present") => "Missing auto-generated tag",
+            "Iteration Path Alignment" when details.Contains("does not have an iteration path") => "No iteration path set",
+            "Iteration Path Alignment" when details.Contains("does not match") => "Iteration path mismatch",
+            "Feature Documentation Coverage" when details.Contains("% of related features") => "Poor feature documentation",
+            "Feature State Consistency" when details.Contains("state") => "State inconsistency",
+            "Release Train Relations" when details.Contains("no relations") => "No work item relations",
+            "Hygiene Check Error" => "Check execution error",
+            _ => checkName // Default to the check name
+        };
+    }
 }
