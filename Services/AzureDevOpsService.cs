@@ -79,13 +79,12 @@ public class AzureDevOpsService : IAzureDevOpsService
             _logger.LogError(ex, "Error retrieving Feature work items");
             throw;
         }
-    }
-
-    public async Task<WorkItem?> GetWorkItemByIdAsync(int workItemId, CancellationToken cancellationToken = default)
+    }    public async Task<WorkItem?> GetWorkItemByIdAsync(int workItemId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?api-version=7.0";
+            var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank";
+            var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?fields={fields}&api-version=7.0";
             
             _logger.LogDebug("Making request to: {Url}", url);
             
@@ -111,10 +110,9 @@ public class AzureDevOpsService : IAzureDevOpsService
     }
 
     public async Task<WorkItem?> GetWorkItemWithRelationsAsync(int workItemId, CancellationToken cancellationToken = default)
-    {
-        try
+    {        try
         {
-            // Include relations by using the $expand parameter
+            // Include relations by using the $expand parameter (cannot use fields parameter with expand)
             var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?$expand=relations&api-version=7.0";
             
             _logger.LogDebug("Making request to get work item with relations: {Url}", url);
@@ -362,12 +360,12 @@ public class AzureDevOpsService : IAzureDevOpsService
         var queryResult = JsonSerializer.Deserialize<WiqlQueryResult>(responseContent, _jsonOptions);
 
         return queryResult?.WorkItems?.Select(wi => wi.Id) ?? Enumerable.Empty<int>();
-    }
-
-    private async Task<IEnumerable<WorkItem>> GetWorkItemsByIdsAsync(IEnumerable<int> workItemIds, CancellationToken cancellationToken)
+    }    private async Task<IEnumerable<WorkItem>> GetWorkItemsByIdsAsync(IEnumerable<int> workItemIds, CancellationToken cancellationToken)
     {
         var ids = string.Join(",", workItemIds);
-        var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems?ids={ids}&api-version=7.0";
+        // Include the fields parameter to ensure we get all necessary fields including IterationPath
+        var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank";
+        var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems?ids={ids}&fields={fields}&api-version=7.0";
         
         _logger.LogDebug("Retrieving work items by IDs: {Ids}", ids);
         _logger.LogDebug("Making request to URL: {Url}", url);
@@ -385,9 +383,7 @@ public class AzureDevOpsService : IAzureDevOpsService
         var workItemsResponse = JsonSerializer.Deserialize<WorkItemsResponse>(content, _jsonOptions);
 
         return workItemsResponse?.Value?.Select(ConvertToWorkItem) ?? Enumerable.Empty<WorkItem>();
-    }
-
-    private WorkItem ConvertToWorkItem(WorkItemResponse? response)
+    }    private WorkItem ConvertToWorkItem(WorkItemResponse? response)
     {
         if (response?.Fields == null)
             return new WorkItem();
@@ -415,6 +411,7 @@ public class AzureDevOpsService : IAzureDevOpsService
             WorkItemType = GetFieldValue(response.Fields, "System.WorkItemType") ?? string.Empty,
             State = GetFieldValue(response.Fields, "System.State") ?? string.Empty,
             Description = GetFieldValue(response.Fields, "System.Description") ?? string.Empty,
+            IterationPath = GetFieldValue(response.Fields, "System.IterationPath"),
             Tags = GetFieldValue(response.Fields, "System.Tags") ?? string.Empty,
             StackRank = stackRank,
             Relations = new List<WorkItemRelation>() // Empty relations list since we didn't request them

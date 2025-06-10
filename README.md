@@ -77,6 +77,15 @@ CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --limit 200 --output csv
 
 # Show only Release Train creation summary
 CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --output summary
+
+# Run ADO hygiene checks in addition to roadmap generation
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --hygiene-checks
+
+# Run only ADO hygiene checks (skip roadmap generation)
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --hygiene-only
+
+# Export hygiene check results to file
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --hygiene-only --file hygiene-report.json
 ```
 
 ### Options
@@ -85,6 +94,8 @@ CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --output summary
 - `-l, --limit <number>`: Maximum number of Feature work items to retrieve (default: 100)
 - `-o, --output <format>`: Output format: console, json, csv, summary (default: console)
 - `-f, --file <path>`: Output file path (auto-generated if not specified)
+- `--hygiene-checks`: Run ADO hygiene checks in addition to roadmap generation
+- `--hygiene-only`: Run only ADO hygiene checks (skip roadmap generation)
 - `-h, --help`: Show help message
 
 ## Building and Running
@@ -115,12 +126,60 @@ dotnet run -- --area-path "MyProject\\MyTeam" --limit 50 --output json
 - **Configurable Area Path**: Filter work items by specifying the Azure DevOps area path
 - **Release Train Creation**: Automatically creates Release Train work items from special title patterns
 - **Pattern Processing**: Recognizes title patterns like `----- Title -----rt` to group features into release trains
+- **ADO Hygiene Checks**: Comprehensive assessment of Release Train and Feature work item health
 - **Multiple Output Formats**: Console display, JSON export, CSV export, summary-only mode
 - **Roadmap Generation**: Converts work items to roadmap items with timeline estimation
 - **Operation Tracking**: Provides detailed summary of Release Train creation and update operations
 - **Simplified Architecture**: Clean separation of concerns without over-engineering
 - **Configuration Management**: Uses Microsoft.Extensions.Configuration
 - **Logging**: Comprehensive logging with Microsoft.Extensions.Logging
+
+## ADO Hygiene Checks
+
+The application includes comprehensive hygiene checks to assess the quality and consistency of Azure DevOps work items:
+
+### Hygiene Check Types
+
+1. **Iteration Path Alignment**: Verifies that Release Train iteration paths align with related Feature work items
+2. **Status Notes Currency**: Checks if Release Trains and Features have adequate descriptions and documentation
+3. **Release Train Completeness**: Validates that Release Trains have sufficient related features and proper tagging
+4. **Feature State Consistency**: Ensures Release Train states are consistent with the progress of related features
+
+### Hygiene Check Severity Levels
+
+- **🔴 Critical**: Issues that require immediate attention
+- **🟠 Error**: Significant problems that should be addressed
+- **🟡 Warning**: Recommendations for improvement
+- **ℹ️ Info**: Informational status updates
+
+### Hygiene Check Output
+
+```
+============================================================
+RUNNING ADO HYGIENE CHECKS
+============================================================
+
+HYGIENE CHECK SUMMARY
+============================================================
+Total Checks: 24
+Passed: 18 ✅
+Failed: 6 ❌
+Health Score: 75.0%
+Error Issues: 2 🟠
+Warning Issues: 4 🟡
+
+FAILED CHECKS
+------------------------------------------------------------
+🟠 [ERROR] Iteration Path Alignment
+   Work Item: #12345 - Q1 2024 Release
+   Issue: Release Train iteration 'Q1 2024' does not match any feature iterations: Q2 2024, Q3 2024
+   Recommendation: Consider aligning Release Train iteration path with related features or vice versa
+
+🟡 [WARNING] Status Notes Currency
+   Work Item: #12346 - User Authentication Feature
+   Issue: Description present (15 characters)
+   Recommendation: Consider adding detailed status notes or description to provide context and current status
+```
 
 ## Sample Output
 
@@ -206,3 +265,15 @@ This application follows clean architecture principles:
 - **Simplified Dependency Injection**: Removed Microsoft.Extensions.Hosting dependency and implemented simple constructor injection
 - **Enhanced Error Handling**: Added validation for required parameters with clear error messages
 - **Updated Documentation**: Comprehensive help and usage examples with new parameter requirements
+
+### v2.1 - Hygiene Check Features
+- **ADO Hygiene Checks**: Added comprehensive hygiene assessment system for Release Trains and Features
+- **Iteration Path Alignment**: Validates consistency between Release Train and Feature iteration paths
+- **Status Documentation**: Checks for adequate descriptions and documentation coverage
+- **Release Train Quality**: Validates feature count, tagging, and overall completeness
+- **State Consistency**: Ensures Release Train states reflect actual Feature progress
+- **Exportable Reports**: Export hygiene check results to JSON or CSV formats
+- **Severity Classification**: Critical, Error, Warning, and Info level categorization
+- **Flexible Output**: Multiple export formats with optional file specification
+- **Better Error Handling**: Improved error messages and validation
+- **Configurable Logging**: Context-aware logging levels based on output mode

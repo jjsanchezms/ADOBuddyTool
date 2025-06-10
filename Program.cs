@@ -20,8 +20,7 @@ try
 {
     // Create logger for the application
     var logger = loggerFactory.CreateLogger<RoadmapApplication>();
-    
-    // Create services with simple constructor injection
+      // Create services with simple constructor injection
     var azureDevOpsLogger = loggerFactory.CreateLogger<AzureDevOpsService>();
     var azureDevOpsService = new AzureDevOpsService(azureDevOpsLogger);
     
@@ -31,8 +30,10 @@ try
     var outputLogger = loggerFactory.CreateLogger<OutputService>();
     var outputService = new OutputService(outputLogger);
     
-    // Create and run the application
-    var app = new RoadmapApplication(azureDevOpsService, roadmapService, outputService, logger);
+    var hygieneLogger = loggerFactory.CreateLogger<HygieneCheckService>();
+    var hygieneService = new HygieneCheckService(azureDevOpsService, hygieneLogger);
+      // Create and run the application
+    var app = new RoadmapApplication(azureDevOpsService, roadmapService, outputService, hygieneService, logger);
     await app.RunAsync(args);
     
     // Cleanup
@@ -79,19 +80,22 @@ public class RoadmapApplication
     private readonly IAzureDevOpsService _azureDevOpsService;
     private readonly RoadmapService _roadmapService;
     private readonly OutputService _outputService;
+    private readonly HygieneCheckService _hygieneService;
     private readonly ILogger<RoadmapApplication> _logger;
 
     public RoadmapApplication(
         IAzureDevOpsService azureDevOpsService,
         RoadmapService roadmapService,
         OutputService outputService,
+        HygieneCheckService hygieneService,
         ILogger<RoadmapApplication> logger)
     {
         _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
         _roadmapService = roadmapService ?? throw new ArgumentNullException(nameof(roadmapService));
         _outputService = outputService ?? throw new ArgumentNullException(nameof(outputService));
+        _hygieneService = hygieneService ?? throw new ArgumentNullException(nameof(hygieneService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }    public async Task RunAsync(string[] args)
+    }public async Task RunAsync(string[] args)
     {        try
         {
             // Parse command line arguments
@@ -126,25 +130,45 @@ public class RoadmapApplication
                 }
                 Console.WriteLine($"No Feature work items found in area path '{options.AreaPath}'.");
                 return;
-            }
-
-            // Only show processing messages if not in summary mode
+            }            // Only show processing messages if not in summary mode
             if (options.OutputFormat != "summary")
             {
                 _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
                 Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
             }
             
-            var roadmapItems = await _roadmapService.GenerateRoadmapAsync(workItems);
-            
-            if (options.OutputFormat != "summary")
+            // Run roadmap generation unless hygiene-only mode
+            IEnumerable<CreateRoadmapADO.Models.RoadmapItem> roadmapItems = Enumerable.Empty<CreateRoadmapADO.Models.RoadmapItem>();
+            if (!options.HygieneChecksOnly)
             {
-                Console.WriteLine("\nFinished processing special title patterns\n");
-            }            // Always display Release Train Summary (this is the main output for summary mode)
-            DisplayReleaseTrainSummary(_roadmapService.OperationsSummary);
+                roadmapItems = await _roadmapService.GenerateRoadmapAsync(workItems);
+                
+                if (options.OutputFormat != "summary")
+                {
+                    Console.WriteLine("\nFinished processing special title patterns\n");
+                }
+                
+                // Always display Release Train Summary (this is the main output for summary mode)
+                DisplayReleaseTrainSummary(_roadmapService.OperationsSummary);
+            }
 
-            // Output roadmap (only if requested)
-            if (options.OutputFormat != "summary")
+            // Run hygiene checks if requested
+            if (options.RunHygieneChecks || options.HygieneChecksOnly)
+            {
+                if (options.OutputFormat != "summary")
+                {
+                    Console.WriteLine("\n" + "=".PadRight(60, '='));
+                    Console.WriteLine("RUNNING ADO HYGIENE CHECKS");
+                    Console.WriteLine("=".PadRight(60, '='));
+                    _logger.LogInformation("Starting ADO hygiene checks on {Count} work items", workItems.Count());
+                }
+                
+                var hygieneResults = await _hygieneService.PerformHygieneChecksAsync(workItems);
+                await DisplayHygieneCheckResults(hygieneResults, options);
+            }
+
+            // Output roadmap (only if requested and not in hygiene-only mode)
+            if (options.OutputFormat != "summary" && !options.HygieneChecksOnly)
             {
                 await OutputRoadmapAsync(roadmapItems, options);
                 _logger.LogInformation("Application completed successfully");
@@ -179,9 +203,15 @@ public class RoadmapApplication
                 case "--area-path" or "-a":
                     if (i + 1 < args.Length)
                         options.AreaPath = args[++i];
-                    break;
-                case "--summary-only" or "-s":
+                    break;                case "--summary-only" or "-s":
                     options.OutputFormat = "summary";
+                    break;
+                case "--hygiene-checks" or "--hygiene":
+                    options.RunHygieneChecks = true;
+                    break;
+                case "--hygiene-only":
+                    options.HygieneChecksOnly = true;
+                    options.RunHygieneChecks = true;
                     break;
                 case "--help" or "-h":
                     ShowHelp();
@@ -227,6 +257,8 @@ public class RoadmapApplication
         Console.WriteLine("  -l, --limit <number>      Maximum number of Feature work items to retrieve (default: 100)");
         Console.WriteLine("  -o, --output <format>     Output format: console, json, csv, summary (default: console)");
         Console.WriteLine("  -f, --file <path>         Output file path (auto-generated if not specified)");
+        Console.WriteLine("  --hygiene-checks          Run ADO hygiene checks in addition to roadmap generation");
+        Console.WriteLine("  --hygiene-only            Run only ADO hygiene checks (skip roadmap generation)");
         Console.WriteLine("  -h, --help                Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
@@ -234,6 +266,8 @@ public class RoadmapApplication
         Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --limit 50 --output json");
         Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --limit 200 --output csv --file roadmap.csv");
         Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --output summary");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-checks");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-only");
     }
 
     /// <summary>
@@ -292,6 +326,64 @@ public class RoadmapApplication
         Console.WriteLine("=".PadRight(60, '='));
         Console.WriteLine();
     }
+
+    /// <summary>
+    /// Displays hygiene check results in a formatted manner
+    /// </summary>
+    /// <param name="hygieneResults">The hygiene check results to display</param>
+    /// <param name="options">Command line options for output formatting</param>
+    private async Task DisplayHygieneCheckResults(HygieneCheckSummary hygieneResults, CommandLineOptions options)
+    {
+        // Display summary
+        Console.WriteLine();
+        Console.WriteLine("HYGIENE CHECK SUMMARY");
+        Console.WriteLine("=".PadRight(60, '='));
+        Console.WriteLine($"Total Checks: {hygieneResults.TotalChecks}");
+        Console.WriteLine($"Passed: {hygieneResults.PassedChecks} ✅");
+        Console.WriteLine($"Failed: {hygieneResults.FailedChecks} ❌");
+        Console.WriteLine($"Health Score: {hygieneResults.HealthScore:F1}%");
+        
+        if (hygieneResults.CriticalIssues > 0)
+            Console.WriteLine($"Critical Issues: {hygieneResults.CriticalIssues} 🔴");
+        if (hygieneResults.ErrorIssues > 0)
+            Console.WriteLine($"Error Issues: {hygieneResults.ErrorIssues} 🟠");
+        if (hygieneResults.WarningIssues > 0)
+            Console.WriteLine($"Warning Issues: {hygieneResults.WarningIssues} 🟡");
+        
+        Console.WriteLine();
+
+        // Display failed checks in detail
+        var failedChecks = hygieneResults.CheckResults.Where(r => !r.Passed).ToList();
+        if (failedChecks.Any())
+        {
+            Console.WriteLine("FAILED CHECKS");
+            Console.WriteLine("-".PadRight(60, '-'));
+            
+            foreach (var check in failedChecks.OrderByDescending(c => c.Severity))
+            {
+                var severityIcon = check.Severity switch
+                {
+                    HygieneCheckSeverity.Critical => "🔴",
+                    HygieneCheckSeverity.Error => "🟠",
+                    HygieneCheckSeverity.Warning => "🟡",
+                    _ => "ℹ️"
+                };
+                
+                Console.WriteLine($"{severityIcon} [{check.Severity.ToString().ToUpper()}] {check.CheckName}");
+                Console.WriteLine($"   Work Item: #{check.WorkItemId} - {check.WorkItemTitle}");
+                Console.WriteLine($"   Issue: {check.Details}");
+                Console.WriteLine($"   Recommendation: {check.Recommendation}");
+                Console.WriteLine();
+            }
+        }
+        
+        // Export to file if requested
+        if (!string.IsNullOrEmpty(options.OutputFile))
+        {
+            await _outputService.ExportHygieneCheckResultsAsync(hygieneResults, options.OutputFile);
+            Console.WriteLine($"Hygiene check results exported to: {options.OutputFile}");
+        }
+    }
 }
 
 /// <summary>
@@ -303,4 +395,6 @@ public class CommandLineOptions
     public string OutputFormat { get; set; } = "console";
     public string? OutputFile { get; set; }
     public string? AreaPath { get; set; }
+    public bool RunHygieneChecks { get; set; } = false;
+    public bool HygieneChecksOnly { get; set; } = false;
 }

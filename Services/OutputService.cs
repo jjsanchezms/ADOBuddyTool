@@ -196,4 +196,103 @@ public class OutputService
         // Escape quotes by doubling them
         return value.Replace("\"", "\"\"");
     }
+
+    /// <summary>
+    /// Exports hygiene check results to a file
+    /// </summary>
+    /// <param name="hygieneResults">Hygiene check results to export</param>
+    /// <param name="filePath">Path to export the file to</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    public async Task ExportHygieneCheckResultsAsync(HygieneCheckSummary hygieneResults, string filePath, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Exporting hygiene check results to: {FilePath}", filePath);
+
+            // Ensure directory exists
+            var directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
+            
+            switch (extension)
+            {
+                case ".json":
+                    await ExportHygieneCheckResultsToJsonAsync(hygieneResults, filePath, cancellationToken);
+                    break;
+                case ".csv":
+                    await ExportHygieneCheckResultsToCsvAsync(hygieneResults, filePath, cancellationToken);
+                    break;
+                default:
+                    // Default to JSON if no extension or unknown extension
+                    await ExportHygieneCheckResultsToJsonAsync(hygieneResults, filePath + ".json", cancellationToken);
+                    break;
+            }
+
+            _logger.LogInformation("Successfully exported hygiene check results to: {FilePath}", filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error exporting hygiene check results to file: {FilePath}", filePath);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Exports hygiene check results to JSON format
+    /// </summary>
+    private async Task ExportHygieneCheckResultsToJsonAsync(HygieneCheckSummary hygieneResults, string filePath, CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(hygieneResults, _jsonOptions);
+        await File.WriteAllTextAsync(filePath, json, cancellationToken);
+    }
+
+    /// <summary>
+    /// Exports hygiene check results to CSV format
+    /// </summary>
+    private async Task ExportHygieneCheckResultsToCsvAsync(HygieneCheckSummary hygieneResults, string filePath, CancellationToken cancellationToken)
+    {
+        var csv = new StringBuilder();
+        
+        // Add header
+        csv.AppendLine("CheckName,Passed,Severity,Description,Details,WorkItemId,WorkItemTitle,Recommendation");
+        
+        // Add data rows
+        foreach (var result in hygieneResults.CheckResults)
+        {
+            var row = string.Join(",",
+                EscapeCsvField(result.CheckName),
+                result.Passed,
+                result.Severity,
+                EscapeCsvField(result.Description),
+                EscapeCsvField(result.Details),
+                result.WorkItemId,
+                EscapeCsvField(result.WorkItemTitle),
+                EscapeCsvField(result.Recommendation)
+            );
+            csv.AppendLine(row);
+        }
+        
+        await File.WriteAllTextAsync(filePath, csv.ToString(), cancellationToken);
+    }
+
+    private static string EscapeCsvField(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        // Escape quotes by doubling them
+        value = value.Replace("\"", "\"\"");
+
+        // If the field contains commas, newlines, or quotes, enclose it in double quotes
+        if (value.Contains(",") || value.Contains("\n") || value.Contains("\""))
+        {
+            value = $"\"{value}\"";
+        }
+
+        return value;
+    }
 }

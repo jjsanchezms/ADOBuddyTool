@@ -18,10 +18,12 @@ public class WorkItem
 
     [JsonPropertyName("stackRank")]
     public double? StackRank { get; set; }
-    
-    [JsonPropertyName("state")]
+      [JsonPropertyName("state")]
     public string State { get; set; } = string.Empty;    [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
+    
+    [JsonPropertyName("iterationPath")]
+    public string? IterationPath { get; set; }
     
     [JsonPropertyName("tags")]
     public string Tags { get; set; } = string.Empty;
