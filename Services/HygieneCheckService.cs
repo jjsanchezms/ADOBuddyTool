@@ -36,30 +36,25 @@ public class HygieneCheckService
 {
     private readonly IAzureDevOpsService _azureDevOpsService;
     private readonly ILogger<HygieneCheckService> _logger;
-    
-    // Individual hygiene checks
+      // Individual hygiene checks
     private readonly ReleaseTrainCompletenessCheck _releaseTrainCompletenessCheck;
     private readonly StatusNotesDocumentationCheck _statusNotesCheck;
     private readonly FeatureStateConsistencyCheck _featureStateConsistencyCheck;
-    private readonly FeatureReleaseTrainRelationshipCheck _featureRelationshipCheck;
 
     /// <summary>
     /// Initializes a new instance of the HygieneCheckService with required dependencies.
     /// </summary>
     /// <param name="azureDevOpsService">Service for Azure DevOps API operations (retrieving work items and relationships)</param>
-    /// <param name="logger">Logger for diagnostic information, debugging, and audit trails</param>
-    /// <param name="releaseTrainCompletenessCheck">Check for Release Train completeness</param>
+    /// <param name="logger">Logger for diagnostic information, debugging, and audit trails</param>    /// <param name="releaseTrainCompletenessCheck">Check for Release Train completeness</param>
     /// <param name="statusNotesCheck">Check for status documentation</param>
     /// <param name="featureStateConsistencyCheck">Check for feature state consistency</param>
-    /// <param name="featureRelationshipCheck">Check for feature-release train relationships</param>
     /// <exception cref="ArgumentNullException">Thrown when any required dependency is null</exception>
     public HygieneCheckService(
         IAzureDevOpsService azureDevOpsService, 
         ILogger<HygieneCheckService> logger,
         ReleaseTrainCompletenessCheck releaseTrainCompletenessCheck,
         StatusNotesDocumentationCheck statusNotesCheck,
-        FeatureStateConsistencyCheck featureStateConsistencyCheck,
-        FeatureReleaseTrainRelationshipCheck featureRelationshipCheck)
+        FeatureStateConsistencyCheck featureStateConsistencyCheck)
     {
         _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
