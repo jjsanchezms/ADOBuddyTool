@@ -21,11 +21,9 @@ Error Issues: 5 🟠
 Warning Issues: 28 🟡
   - No description provided: 10 🟡
   - Description too short: 5 🟡
-  - Missing auto-generated tag: 4 🟡
   - Iteration path mismatch: 3 🟡
   - Poor feature documentation: 3 🟡
   - State inconsistency: 2 🟡
-  - No tags found: 1 🟡
 
 FAILED CHECKS
 ------------------------------------------------------------
@@ -38,11 +36,6 @@ FAILED CHECKS
    Work Item: #3241850 - Authentication Service Enhancement
    Issue: No description provided
    Recommendation: Consider adding detailed status notes or description to provide context and current status
-
-🟡 [WARNING] Release Train Tagging
-   Work Item: #3241920 - Data Processing Pipeline
-   Issue: No tags found
-   Recommendation: Ensure Release Train has 'auto-generated' tag and other relevant tags
 ```
 
 ## Issue Pattern Categories
@@ -57,11 +50,9 @@ The system automatically categorizes common issue patterns:
 ### Warning Issues (🟡)
 - **No description provided**: Work items with completely empty descriptions
 - **Description too short**: Work items with descriptions under 20 characters
-- **Missing auto-generated tag**: Release Trains without proper tagging
 - **Iteration path mismatch**: Release Train and Feature iteration paths don't align
 - **Poor feature documentation**: Low percentage of features with adequate documentation
 - **State inconsistency**: Release Train state doesn't match feature progress
-- **No tags found**: Work items without any tags
 - **No work item relations**: Release Trains without any linked work items
 
 ## Benefits

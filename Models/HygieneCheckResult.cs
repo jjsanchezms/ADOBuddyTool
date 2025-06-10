@@ -33,12 +33,15 @@ public class HygieneCheckResult
     /// <summary>
     /// Work item ID this check applies to
     /// </summary>
-    public int WorkItemId { get; set; }
-
-    /// <summary>
+    public int WorkItemId { get; set; }    /// <summary>
     /// Work item title for context
     /// </summary>
     public string WorkItemTitle { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Azure DevOps URL to the work item
+    /// </summary>
+    public string WorkItemUrl { get; set; } = string.Empty;
 
     /// <summary>
     /// Recommendations for fixing the issue
@@ -109,9 +112,9 @@ public class HygieneCheckSummary
     public Dictionary<HygieneCheckSeverity, Dictionary<string, List<HygieneCheckResult>>> GetIssueBreakdown()
     {
         var breakdown = new Dictionary<HygieneCheckSeverity, Dictionary<string, List<HygieneCheckResult>>>();
-        
+
         var failedChecks = CheckResults.Where(r => !r.Passed).ToList();
-        
+
         foreach (var severity in Enum.GetValues<HygieneCheckSeverity>())
         {
             var severityChecks = failedChecks.Where(r => r.Severity == severity).ToList();
@@ -122,7 +125,7 @@ public class HygieneCheckSummary
                     .ToDictionary(g => g.Key, g => g.ToList());
             }
         }
-        
+
         return breakdown;
     }
 
@@ -163,6 +166,10 @@ public class HygieneCheckSummary
     /// </summary>
     private static string GetIssuePattern(HygieneCheckResult result)
     {
+        // Only categorize failed checks - passed checks shouldn't be in pattern summaries
+        if (result.Passed)
+            return result.CheckName; // This shouldn't normally be called for passed checks
+
         var checkName = result.CheckName;
         var details = result.Details?.ToLowerInvariant() ?? "";
 
@@ -172,11 +179,9 @@ public class HygieneCheckSummary
             "Status Notes Currency" when details.Contains("description present") => "Description too short",
             "Release Train Completeness" when details.Contains("0 related features") => "No related features",
             "Release Train Completeness" when details.Contains("related features") => "Insufficient features",
-            "Release Train Tagging" when details.Contains("no tags") => "No tags found",
-            "Release Train Tagging" when details.Contains("tags present") => "Missing auto-generated tag",
             "Iteration Path Alignment" when details.Contains("does not have an iteration path") => "No iteration path set",
             "Iteration Path Alignment" when details.Contains("does not match") => "Iteration path mismatch",
-            "Feature Documentation Coverage" when details.Contains("% of related features") => "Poor feature documentation",
+            "Feature Documentation Coverage" => "Poor feature documentation",
             "Feature State Consistency" when details.Contains("state") => "State inconsistency",
             "Release Train Relations" when details.Contains("no relations") => "No work item relations",
             "Hygiene Check Error" => "Check execution error",

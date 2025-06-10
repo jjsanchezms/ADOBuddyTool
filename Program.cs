@@ -420,9 +420,9 @@ public class RoadmapApplication
                     HygieneCheckSeverity.Warning => "🟡",
                     _ => "ℹ️"
                 };
-                
-                Console.WriteLine($"{severityIcon} [{check.Severity.ToString().ToUpper()}] {check.CheckName}");
+                  Console.WriteLine($"{severityIcon} [{check.Severity.ToString().ToUpper()}] {check.CheckName}");
                 Console.WriteLine($"   Work Item: #{check.WorkItemId} - {check.WorkItemTitle}");
+                Console.WriteLine($"   URL: {check.WorkItemUrl}");
                 Console.WriteLine($"   Issue: {check.Details}");
                 Console.WriteLine($"   Recommendation: {check.Recommendation}");
                 Console.WriteLine();

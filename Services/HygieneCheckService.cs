@@ -1,5 +1,6 @@
 using CreateRoadmapADO.Interfaces;
 using CreateRoadmapADO.Models;
+using CreateRoadmapADO.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace CreateRoadmapADO.Services;
@@ -10,10 +11,23 @@ namespace CreateRoadmapADO.Services;
 public class HygieneCheckService
 {
     private readonly IAzureDevOpsService _azureDevOpsService;
-    private readonly ILogger<HygieneCheckService> _logger;    public HygieneCheckService(IAzureDevOpsService azureDevOpsService, ILogger<HygieneCheckService> logger)
+    private readonly ILogger<HygieneCheckService> _logger;
+    private readonly AzureDevOpsOptions _options;
+
+    public HygieneCheckService(IAzureDevOpsService azureDevOpsService, ILogger<HygieneCheckService> logger)
     {
         _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _options = ConfigurationReader.GetAzureDevOpsOptions();    }
+
+    /// <summary>
+    /// Generates the Azure DevOps URL for a work item
+    /// </summary>
+    /// <param name="workItemId">The work item ID</param>
+    /// <returns>The full Azure DevOps URL to the work item</returns>
+    private string GetWorkItemUrl(int workItemId)
+    {
+        return $"https://dev.azure.com/{_options.Organization}/{_options.Project}/_workitems/edit/{workItemId}";
     }
 
     /// <summary>
@@ -88,8 +102,7 @@ public class HygieneCheckService
                 // Get the Release Train with its relations
                 var releaseTrainWithRelations = await _azureDevOpsService.GetWorkItemWithRelationsAsync(releaseTrain.Id, cancellationToken);
                 
-                if (releaseTrainWithRelations?.Relations == null)
-                {                    summary.CheckResults.Add(new HygieneCheckResult
+                if (releaseTrainWithRelations?.Relations == null)                {                    summary.CheckResults.Add(new HygieneCheckResult
                     {
                         CheckName = "Release Train Relations",
                         Passed = false,
@@ -98,6 +111,7 @@ public class HygieneCheckService
                         Details = "No relations found for this Release Train",
                         WorkItemId = releaseTrain.Id,
                         WorkItemTitle = releaseTrain.Title,
+                        WorkItemUrl = GetWorkItemUrl(releaseTrain.Id),
                         Recommendation = "Ensure this Release Train has related or child Feature work items"
                     });
                     continue;
@@ -145,8 +159,7 @@ public class HygieneCheckService
                 await CheckFeatureStateConsistency(summary, releaseTrainWithRelations, relatedFeatures);
             }
             catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error performing hygiene checks for Release Train {Id}", releaseTrain.Id);
+            {                _logger.LogError(ex, "Error performing hygiene checks for Release Train {Id}", releaseTrain.Id);
                 summary.CheckResults.Add(new HygieneCheckResult
                 {
                     CheckName = "Hygiene Check Error",
@@ -156,6 +169,7 @@ public class HygieneCheckService
                     Details = $"Exception: {ex.Message}",
                     WorkItemId = releaseTrain.Id,
                     WorkItemTitle = releaseTrain.Title,
+                    WorkItemUrl = GetWorkItemUrl(releaseTrain.Id),
                     Recommendation = "Review work item permissions and data integrity"
                 });
             }
@@ -171,8 +185,7 @@ public class HygieneCheckService
     private Task CheckIterationPathAlignment(HygieneCheckSummary summary, WorkItem releaseTrain, List<WorkItem> relatedFeatures)
     {
         var checkName = "Iteration Path Alignment";
-        
-        if (!relatedFeatures.Any())
+          if (!relatedFeatures.Any())
         {
             summary.CheckResults.Add(new HygieneCheckResult
             {
@@ -183,6 +196,7 @@ public class HygieneCheckService
                 Details = "No related features found to compare iteration paths",
                 WorkItemId = releaseTrain.Id,
                 WorkItemTitle = releaseTrain.Title,
+                WorkItemUrl = GetWorkItemUrl(releaseTrain.Id),
                 Recommendation = "Add related Feature work items to this Release Train"
             });
             return Task.CompletedTask;
@@ -193,9 +207,7 @@ public class HygieneCheckService
             .Where(f => !string.IsNullOrWhiteSpace(f.IterationPath))
             .Select(f => f.IterationPath!.Trim())
             .Distinct()
-            .ToList();
-
-        if (string.IsNullOrWhiteSpace(releaseTrainIterationPath))
+            .ToList();        if (string.IsNullOrWhiteSpace(releaseTrainIterationPath))
         {
             summary.CheckResults.Add(new HygieneCheckResult
             {
@@ -206,6 +218,7 @@ public class HygieneCheckService
                 Details = "Release Train does not have an iteration path assigned",
                 WorkItemId = releaseTrain.Id,
                 WorkItemTitle = releaseTrain.Title,
+                WorkItemUrl = GetWorkItemUrl(releaseTrain.Id),
                 Recommendation = "Set an appropriate iteration path for this Release Train"
             });
             return Task.CompletedTask;
@@ -214,9 +227,7 @@ public class HygieneCheckService
         var hasMatchingIteration = featureIterationPaths.Any(fp => 
             string.Equals(fp, releaseTrainIterationPath, StringComparison.OrdinalIgnoreCase) ||
             fp.StartsWith(releaseTrainIterationPath, StringComparison.OrdinalIgnoreCase) ||
-            releaseTrainIterationPath.StartsWith(fp, StringComparison.OrdinalIgnoreCase));
-
-        summary.CheckResults.Add(new HygieneCheckResult
+            releaseTrainIterationPath.StartsWith(fp, StringComparison.OrdinalIgnoreCase));        summary.CheckResults.Add(new HygieneCheckResult
         {
             CheckName = checkName,
             Passed = hasMatchingIteration,
@@ -227,6 +238,7 @@ public class HygieneCheckService
                 : $"Release Train iteration '{releaseTrainIterationPath}' does not match any feature iterations: {string.Join(", ", featureIterationPaths)}",
             WorkItemId = releaseTrain.Id,
             WorkItemTitle = releaseTrain.Title,
+            WorkItemUrl = GetWorkItemUrl(releaseTrain.Id),
             Recommendation = hasMatchingIteration 
                 ? "Iteration path alignment is good"
                 : "Consider aligning Release Train iteration path with related features or vice versa"
@@ -242,9 +254,7 @@ public class HygieneCheckService
 
         // Check Release Train description
         var hasDescription = !string.IsNullOrWhiteSpace(releaseTrain.Description);
-        var descriptionLength = releaseTrain.Description?.Trim().Length ?? 0;
-
-        summary.CheckResults.Add(new HygieneCheckResult
+        var descriptionLength = releaseTrain.Description?.Trim().Length ?? 0;        summary.CheckResults.Add(new HygieneCheckResult
         {
             CheckName = checkName,
             Passed = hasDescription && descriptionLength > 20,
@@ -255,6 +265,7 @@ public class HygieneCheckService
                 : "No description provided",
             WorkItemId = releaseTrain.Id,
             WorkItemTitle = releaseTrain.Title,
+            WorkItemUrl = GetWorkItemUrl(releaseTrain.Id),
             Recommendation = hasDescription && descriptionLength > 20
                 ? "Status documentation looks adequate"
                 : "Consider adding detailed status notes or description to provide context and current status"
@@ -266,8 +277,7 @@ public class HygieneCheckService
         if (relatedFeatures.Any())
         {
             var descriptionCoverage = (double)(relatedFeatures.Count - featuresWithoutDescription.Count) / relatedFeatures.Count * 100;
-            
-            summary.CheckResults.Add(new HygieneCheckResult
+              summary.CheckResults.Add(new HygieneCheckResult
             {
                 CheckName = "Feature Documentation Coverage",
                 Passed = descriptionCoverage >= 80,
@@ -276,6 +286,7 @@ public class HygieneCheckService
                 Details = $"{descriptionCoverage:F1}% of related features have descriptions ({relatedFeatures.Count - featuresWithoutDescription.Count}/{relatedFeatures.Count})",
                 WorkItemId = releaseTrain.Id,
                 WorkItemTitle = releaseTrain.Title,
+                WorkItemUrl = GetWorkItemUrl(releaseTrain.Id),
                 Recommendation = descriptionCoverage >= 80
                     ? "Feature documentation coverage is good"
                     : $"Consider adding descriptions to {featuresWithoutDescription.Count} features without documentation"
@@ -291,10 +302,7 @@ public class HygieneCheckService
         var checkName = "Release Train Completeness";
 
         // Check if Release Train has adequate number of features
-        var featureCount = relatedFeatures.Count;
-        var hasAdequateFeatures = featureCount >= 1;
-
-        summary.CheckResults.Add(new HygieneCheckResult
+        var featureCount = relatedFeatures.Count;        var hasAdequateFeatures = featureCount >= 1;        summary.CheckResults.Add(new HygieneCheckResult
         {
             CheckName = checkName,
             Passed = hasAdequateFeatures,
@@ -303,27 +311,10 @@ public class HygieneCheckService
             Details = $"Release Train has {featureCount} related features",
             WorkItemId = releaseTrain.Id,
             WorkItemTitle = releaseTrain.Title,
+            WorkItemUrl = GetWorkItemUrl(releaseTrain.Id),
             Recommendation = hasAdequateFeatures
                 ? "Feature count looks appropriate"
                 : "Release Train should have at least one related feature"
-        });        // Check if Release Train has proper tags
-        var hasTags = !string.IsNullOrWhiteSpace(releaseTrain.Tags);
-        var hasAutoGeneratedTag = releaseTrain.Tags?.Contains("auto-generated") == true;
-
-        summary.CheckResults.Add(new HygieneCheckResult
-        {
-            CheckName = "Release Train Tagging",
-            Passed = hasTags && hasAutoGeneratedTag,
-            Severity = hasTags && hasAutoGeneratedTag ? HygieneCheckSeverity.Info : HygieneCheckSeverity.Warning,
-            Description = "Check if Release Train has proper tagging",
-            Details = hasTags 
-                ? $"Tags present: {releaseTrain.Tags}"
-                : "No tags found",
-            WorkItemId = releaseTrain.Id,
-            WorkItemTitle = releaseTrain.Title,
-            Recommendation = hasTags && hasAutoGeneratedTag
-                ? "Tagging looks appropriate"
-                : "Ensure Release Train has 'auto-generated' tag and other relevant tags"
         });
         
         return Task.CompletedTask;
@@ -369,9 +360,7 @@ public class HygieneCheckService
                 isConsistent = false;
                 inconsistencyDetails.Add($"Release Train is in '{releaseTrain.State}' state but has {activeFeatures + completedFeatures} features that are active or complete");
             }
-        }
-
-        summary.CheckResults.Add(new HygieneCheckResult
+        }        summary.CheckResults.Add(new HygieneCheckResult
         {
             CheckName = checkName,
             Passed = isConsistent,
@@ -382,6 +371,7 @@ public class HygieneCheckService
                 : string.Join("; ", inconsistencyDetails),
             WorkItemId = releaseTrain.Id,
             WorkItemTitle = releaseTrain.Title,
+            WorkItemUrl = GetWorkItemUrl(releaseTrain.Id),
             Recommendation = isConsistent
                 ? "State consistency looks good"
                 : "Review Release Train state to ensure it reflects the actual progress of related features"

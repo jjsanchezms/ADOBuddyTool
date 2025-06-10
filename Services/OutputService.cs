@@ -256,9 +256,8 @@ public class OutputService
     private async Task ExportHygieneCheckResultsToCsvAsync(HygieneCheckSummary hygieneResults, string filePath, CancellationToken cancellationToken)
     {
         var csv = new StringBuilder();
-        
-        // Add header
-        csv.AppendLine("CheckName,Passed,Severity,Description,Details,WorkItemId,WorkItemTitle,Recommendation");
+          // Add header
+        csv.AppendLine("CheckName,Passed,Severity,Description,Details,WorkItemId,WorkItemTitle,WorkItemUrl,Recommendation");
         
         // Add data rows
         foreach (var result in hygieneResults.CheckResults)
@@ -271,6 +270,7 @@ public class OutputService
                 EscapeCsvField(result.Details),
                 result.WorkItemId,
                 EscapeCsvField(result.WorkItemTitle),
+                EscapeCsvField(result.WorkItemUrl),
                 EscapeCsvField(result.Recommendation)
             );
             csv.AppendLine(row);
