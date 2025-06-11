@@ -44,6 +44,16 @@ The application automatically processes Feature work items with special title pa
 - To update an existing Release Train: `----- Release Train Name -----rt:12345` (where 12345 is the existing work item ID)
 - End the group with: `------------`
 
+### Automatic Error Recovery
+**NEW FEATURE**: When a Feature references a non-existent Release Train ID (e.g., `----- GCCH -----rt:4160082` where Release Train #4160082 doesn't exist), the application will:
+
+1. **Automatically create a new Release Train** instead of failing
+2. **Update the Feature title** with the new Release Train ID (e.g., `----- GCCH -----rt:4170000`)
+3. **Log the recovery operation** for transparency
+4. **Continue processing** without interruption
+
+This ensures data integrity and prevents broken references while maintaining the intended Release Train structure.
+
 ### Example
 ```
 Feature 1: ----- Q1 2024 Release -----rt
@@ -54,6 +64,20 @@ Feature 5: ------------
 ```
 
 This will create a Release Train called "Q1 2024 Release" with Features 2, 3, and 4 as child items.
+
+### Error Recovery Example
+```
+Feature 1: ----- GCCH -----rt:4160082    # Non-existent Release Train ID
+Feature 2: Data Migration
+Feature 3: API Updates
+Feature 4: ------------
+```
+
+**Result:**
+- ❌ Release Train #4160082 doesn't exist
+- 🔄 Creates new Release Train #4170000 instead
+- ✅ Updates Feature 1 title to: `----- GCCH -----rt:4170000`
+- ✅ Links Features 2 and 3 to the new Release Train
 
 ## Usage
 
@@ -126,6 +150,7 @@ dotnet run -- --area-path "MyProject\\MyTeam" --limit 50 --output json
 - **Configurable Area Path**: Filter work items by specifying the Azure DevOps area path
 - **Release Train Creation**: Automatically creates Release Train work items from special title patterns
 - **Pattern Processing**: Recognizes title patterns like `----- Title -----rt` to group features into release trains
+- **Automatic Error Recovery**: When Features reference non-existent Release Train IDs, automatically creates new Release Trains and updates Feature titles
 - **ADO Hygiene Checks**: Comprehensive assessment of Release Train and Feature work item health
 - **Multiple Output Formats**: Console display, JSON export, CSV export, summary-only mode
 - **Roadmap Generation**: Converts work items to roadmap items with timeline estimation
@@ -190,14 +215,25 @@ RELEASE TRAIN SUMMARY
 ============================================================
 ✅ Backlog read successfully (150 items processed)
 
-🆕 CREATED (2):
+🆕 CREATED (3):
    • Release Train #54321: "Q1 2024 Release" (15 work items)
    • Release Train #54322: "Security Improvements" (8 work items)
+   • Release Train #54323: "GCCH" (5 work items) [Recovery: replaced non-existent #4160082]
 
 🔄 UPDATED (1):
    • Release Train #54320: "Performance Optimization" (12 total work items, +3 new relations)
 
 ============================================================
+```
+
+### Console Output with Error Recovery
+```
+========================================================================================
+❌ ERROR: Release Train #4160082 does not exist
+🔄 RECOVERY: Creating new Release Train instead
+✅ Created new Release Train #54323 instead of #4160082
+🔄 Updating Feature title to reference new Release Train #54323
+========================================================================================
 ```
 
 ### Console Output
@@ -277,3 +313,11 @@ This application follows clean architecture principles:
 - **Flexible Output**: Multiple export formats with optional file specification
 - **Better Error Handling**: Improved error messages and validation
 - **Configurable Logging**: Context-aware logging levels based on output mode
+
+### v2.2 - Automatic Error Recovery
+- **Non-Existent Release Train Recovery**: Automatically creates new Release Trains when Features reference IDs that don't exist
+- **Feature Title Auto-Update**: Updates Feature titles with new Release Train IDs after automatic recovery
+- **Enhanced Logging**: Detailed logging of recovery operations and title updates
+- **Data Integrity Protection**: Prevents broken references while maintaining intended Release Train structure
+- **Seamless Operation**: Recovery happens transparently without interrupting the overall process
+- **Error Recovery Tracking**: Operations summary includes information about created replacement Release Trains
