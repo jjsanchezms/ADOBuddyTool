@@ -1,0 +1,104 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug - Create Roadmap",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "args": [
+                "--area-path",
+                "SPOOL\\Resource Provider",
+                "--create-roadmap"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Debug - Hygiene Checks",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "args": [
+                "--area-path",
+                "SPOOL\\Resource Provider",
+                "--hygiene-checks"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Debug - Both Operations",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "args": [
+                "--area-path",
+                "SPOOL\\Resource Provider",
+                "--create-roadmap",
+                "--hygiene-checks",
+                "--output",
+                "summary"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Debug - Custom Parameters",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "args": [
+                "--area-path",
+                "SPOOL\\Resource Provider",
+                "--create-roadmap",
+                "--limit",
+                "50"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Debug - JSON Output",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "args": [
+                "--area-path",
+                "SPOOL\\Resource Provider",
+                "--create-roadmap",
+                "--output",
+                "json",
+                "--file",
+                "debug-roadmap.json"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        }
+    ]
+}

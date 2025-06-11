@@ -101,6 +101,12 @@ public class AzureDevOpsService : IAzureDevOpsService
             }
 
             _logger.LogInformation("Found {Count} {WorkItemType} work items, retrieving {Limit}", workItemIds.Count(), workItemType, limitedIds.Count());            // Get the full work item details for the limited set
+
+            Console.WriteLine("Work item IDs received (in order):");
+            foreach (var id in limitedIds)
+            {
+                Console.WriteLine(id);
+            }
             return await GetWorkItemsByIdsAsync(limitedIds, cancellationToken);
         }
         catch (Exception ex)
@@ -255,7 +261,8 @@ public class AzureDevOpsService : IAzureDevOpsService
                 return Enumerable.Empty<WorkItem>();
             }
 
-            return await GetWorkItemsByIdsAsync(workItemIds, cancellationToken);        }
+            return await GetWorkItemsByIdsAsync(workItemIds, cancellationToken);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing WIQL query: {Query}", wiqlQuery);
@@ -408,11 +415,18 @@ public class AzureDevOpsService : IAzureDevOpsService
             _logger.LogError("Failed to retrieve work items. Status: {StatusCode}, Content: {Content}", response.StatusCode, errorContent);
             throw new HttpRequestException($"Failed to retrieve work items with status {response.StatusCode}: {errorContent}");
         }
-
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         var workItemsResponse = JsonSerializer.Deserialize<WorkItemsResponse>(content, _jsonOptions);
 
-        return workItemsResponse?.Value?.Select(ConvertToWorkItem) ?? Enumerable.Empty<WorkItem>();
+        // Convert work items to dictionary for quick lookup
+        var workItemsDict = workItemsResponse?.Value?
+            .Select(ConvertToWorkItem)
+            .ToDictionary(wi => wi.Id, wi => wi) ?? new Dictionary<int, WorkItem>();
+
+        // Return work items in the same order as the input IDs
+        return workItemIds
+            .Where(id => workItemsDict.ContainsKey(id))
+            .Select(id => workItemsDict[id]);
     }
     private WorkItem ConvertToWorkItem(WorkItemResponse? response)
     {

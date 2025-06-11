@@ -70,6 +70,15 @@ public class RoadmapService
         int currentPatternItemId = 0;
         bool isCollectingItems = false;
 
+        // Print the work items in the order they will be processed
+        _logger.LogInformation("Work items in processing order:");
+        for (int i = 0; i < workItemsList.Count; i++)
+        {
+            var wi = workItemsList[i];
+            _logger.LogInformation("  [{Index}] #{Id} - {Title}", i + 1, wi.Id, wi.Title);
+        }
+
+
         _logger.LogInformation("Scanning for special title patterns in work items"); foreach (var workItem in workItemsList)
         {            // Check for special title patterns
             // Match titles like "----- TITLE -----rt" or "----------- TITLE ----------rt:1234"
