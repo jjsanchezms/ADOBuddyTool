@@ -75,7 +75,7 @@ public class RoadmapService
             // Match titles like "----- TITLE -----rt" or "----------- TITLE ----------rt:1234"
             // Only look for "rt" patterns (release trains)
             // Updated regex to handle various dash patterns and spacing
-            var patternStart = new Regex(@"^-+\s*(.*?)\s*-+rt(?::(\d+))?$", RegexOptions.IgnoreCase);
+            var patternStart = new Regex(@"^---\s*(.*?)\s*---rt(?::(\d+))?$", RegexOptions.IgnoreCase);
             var match = patternStart.Match(workItem.Title);
             // Check if this is a section separator (like "CY25H1 Features Begin")
             var isSectionSeparator = workItem.Title.StartsWith("---");
@@ -407,19 +407,9 @@ public class RoadmapService
     public IEnumerable<RoadmapItem> SortRoadmapItems(IEnumerable<RoadmapItem> roadmapItems)
     {
         return roadmapItems
-            .OrderBy(item => item.StackRank ?? double.MaxValue) // Sort by StackRank (ASC) first
-            .ThenByDescending(item => item.Priority ?? 0) // Then by priority (DESC)
+            .OrderBy(item => item.StackRank ?? double.MaxValue) // Sort by StackRank (ASC) first            .ThenByDescending(item => item.Priority ?? 0) // Then by priority (DESC)
             .ThenBy(item => item.StartDate ?? DateTime.MaxValue) // Then by start date (ASC)
             .ThenBy(item => item.Title); // Finally alphabetical
-    }
-    public async Task CreateReleaseTrainAsync(List<int> children, string title)
-    {
-        // Call the service that actually implements this
-        // to avoid circular dependency issues
-        if (_azureDevOpsService != null)
-        {
-            await _azureDevOpsService.CreateReleaseTrainAsync(children, title);
-        }
     }
 
     private static RoadmapItemType MapWorkItemTypeToRoadmapType(string workItemType)

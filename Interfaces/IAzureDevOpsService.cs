@@ -81,20 +81,11 @@ public interface IAzureDevOpsService : IDisposable
     
     /// <summary>
     /// Updates a work item's title
-    /// </summary>
-    /// <param name="workItemId">ID of the work item to update</param>
+    /// </summary>    /// <param name="workItemId">ID of the work item to update</param>
     /// <param name="newTitle">The new title for the work item</param>
     /// <returns>Task representing the asynchronous operation</returns>
     Task UpdateWorkItemTitleAsync(int workItemId, string newTitle);
     
-    /// <summary>
-    /// Checks if a work item has an existing related auto-generated Release Train
-    /// </summary>
-    /// <param name="workItemId">ID of the work item to check</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Task containing the ID of the existing parent item, or 0 if none exists</returns>
-    Task<int> CheckForExistingParentAsync(int workItemId, CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Creates a specific relation between two work items
     /// </summary>
