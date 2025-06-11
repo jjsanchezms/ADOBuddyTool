@@ -103,10 +103,9 @@ public class RoadmapApplication
             ShowHelp();
             return false;
         }
-
-        if (!options.RunHygieneChecks && !options.CreateRoadmap)
+        if (!options.RunHygieneChecks && !options.CreateRoadmap && !options.SwagUpdates)
         {
-            Console.WriteLine("Error: At least one operation must be specified (--hygiene-checks or --create-roadmap).");
+            Console.WriteLine("Error: At least one operation must be specified (--hygiene-checks, --create-roadmap, or --swag-updates).");
             Console.WriteLine();
             ShowHelp();
             return false;
@@ -118,8 +117,7 @@ public class RoadmapApplication
     {
         LogWorkItemRetrieval(options);
 
-        return options.RunHygieneChecks
-            ? await _services.AzureDevOps.GetWorkItemsForHygieneChecksAsync(options.Limit, options.AreaPath!)
+        return options.RunHygieneChecks || options.SwagUpdates ? await _services.AzureDevOps.GetWorkItemsForHygieneChecksAsync(options.Limit, options.AreaPath!)
             : await _services.AzureDevOps.GetWorkItemsAsync(options.Limit, options.AreaPath!);
     }
 
@@ -131,12 +129,25 @@ public class RoadmapApplication
     {
         if (options.Summary) return;
 
-        var operationType = options.RunHygieneChecks ? "hygiene checks" : "roadmap generation";
+        var operationType = GetOperationType(options);
         var workItemTypes = GetWorkItemTypeDescription(options);
 
         _logger.LogInformation("Retrieving {WorkItemTypes} for {OperationType} (limit: {Limit}, area path: {AreaPath})",
             workItemTypes, operationType, options.Limit, options.AreaPath);
     }
+
+    /// <summary>
+    /// Gets operation type description based on options
+    /// </summary>
+    /// <param name="options">Command line options</param>
+    /// <returns>Operation type description</returns>
+    private static string GetOperationType(CommandLineOptions options)
+    {
+        if (options.RunHygieneChecks) return "hygiene checks";
+        if (options.SwagUpdates) return "SWAG updates";
+        return "roadmap generation";
+    }
+
     private void HandleNoWorkItemsFound(CommandLineOptions options)
     {
         if (!options.Summary)
@@ -155,11 +166,10 @@ public class RoadmapApplication
     /// <returns>Description of work item types being processed</returns>
     private static string GetWorkItemTypeDescription(CommandLineOptions options)
     {
-        return options.RunHygieneChecks
+        return options.RunHygieneChecks || options.SwagUpdates
             ? "Feature or Release Train work items"
             : "Feature work items";
     }
-
     private async Task ProcessOperationsAsync(IEnumerable<WorkItem> workItems, CommandLineOptions options)
     {
         IEnumerable<CreateRoadmapADO.Models.RoadmapItem> roadmapItems = Enumerable.Empty<CreateRoadmapADO.Models.RoadmapItem>();
@@ -172,6 +182,11 @@ public class RoadmapApplication
         if (options.RunHygieneChecks)
         {
             await ProcessHygieneChecksAsync(workItems, options);
+        }
+
+        if (options.SwagUpdates)
+        {
+            await ProcessSwagUpdatesAsync(workItems, options);
         }
 
         if (!options.Summary && options.CreateRoadmap)
@@ -214,6 +229,131 @@ public class RoadmapApplication
         DisplayHygieneCheckResults(hygieneResults, options);
     }
 
+    private async Task ProcessSwagUpdatesAsync(IEnumerable<WorkItem> workItems, CommandLineOptions options)
+    {
+        if (!options.Summary)
+        {
+            Console.WriteLine("\n" + "=".PadRight(ConsoleSeparatorWidth, '='));
+            Console.WriteLine("PROCESSING SWAG UPDATES");
+            Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
+            _logger.LogInformation("Starting SWAG updates on Release Trains in area path: {AreaPath}", options.AreaPath);
+        }
+
+        var workItemsList = workItems.ToList();
+
+        // Find all Release Trains in the area path
+        var releaseTrains = workItemsList
+            .Where(w => w.WorkItemType == "Release Train")
+            .ToList();
+
+        // Find all Features for SWAG calculation
+        var features = workItemsList
+            .Where(w => w.WorkItemType == "Feature")
+            .ToList();
+
+        if (!releaseTrains.Any())
+        {
+            Console.WriteLine("No Release Trains found in the specified area path.");
+            return;
+        }
+
+        _logger.LogInformation("Found {ReleaseTrainCount} Release Trains and {FeatureCount} Features to process",
+            releaseTrains.Count, features.Count);
+
+        int updatedCount = 0;
+        int warningCount = 0;
+
+        foreach (var releaseTrain in releaseTrains)
+        {
+            try
+            {
+                // Get the Release Train with its relations
+                var releaseTrainWithRelations = await _services.AzureDevOps.GetWorkItemWithRelationsAsync(releaseTrain.Id);
+
+                if (releaseTrainWithRelations?.Relations == null)
+                {
+                    Console.WriteLine($"⚠️  Release Train #{releaseTrain.Id} has no relations - skipping");
+                    continue;
+                }
+
+                // Get related feature IDs
+                var relatedFeatureIds = releaseTrainWithRelations.Relations
+                    .Where(r => r.Rel == "System.LinkTypes.Related" ||
+                               r.Rel == "System.LinkTypes.Hierarchy-Forward" ||
+                               r.Rel == "System.LinkTypes.Hierarchy-Reverse")
+                    .Select(r => r.GetRelatedWorkItemId())
+                    .Where(id => id > 0)
+                    .ToList();
+
+                if (!relatedFeatureIds.Any())
+                {
+                    Console.WriteLine($"⚠️  Release Train #{releaseTrain.Id} '{releaseTrain.Title}' has no related Features - skipping");
+                    continue;
+                }
+
+                // Get the actual feature work items with SWAG values
+                var relatedFeatures = new List<WorkItem>();
+                foreach (var featureId in relatedFeatureIds)
+                {
+                    var feature = await _services.AzureDevOps.GetWorkItemByIdAsync(featureId);
+                    if (feature != null && feature.WorkItemType == "Feature")
+                    {
+                        relatedFeatures.Add(feature);
+                    }
+                }
+
+                if (!relatedFeatures.Any())
+                {
+                    Console.WriteLine($"⚠️  Release Train #{releaseTrain.Id} '{releaseTrain.Title}' has no valid Feature relations - skipping");
+                    continue;
+                }                // Calculate total SWAG from related features
+                var totalSwag = relatedFeatures
+                    .Where(f => f.Swag.HasValue)
+                    .Sum(f => f.Swag!.Value); var featuresWithSwag = relatedFeatures.Count(f => f.Swag.HasValue);
+                var featuresWithoutSwag = relatedFeatures.Count - featuresWithSwag;                // Check if Release Train has auto-generated tag
+                bool isAutoGenerated = !string.IsNullOrEmpty(releaseTrain.Tags) &&
+                    releaseTrain.Tags.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                        .Any(tag => tag.Trim().Equals("auto-generated", StringComparison.OrdinalIgnoreCase));// Extract current SWAG from status notes if present
+                var currentSwagFromStatusNotes = CreateRoadmapADO.Services.AzureDevOpsService.ExtractSwagFromDescription(releaseTrain.StatusNotes);
+
+                Console.WriteLine($"\n📊 Release Train #{releaseTrain.Id}: '{releaseTrain.Title}'");
+                Console.WriteLine($"   Auto-generated: {(isAutoGenerated ? "Yes" : "No")}");
+                Console.WriteLine($"   Related Features: {relatedFeatures.Count} ({featuresWithSwag} with SWAG, {featuresWithoutSwag} without)");
+                Console.WriteLine($"   Current RT SWAG (from status notes): {currentSwagFromStatusNotes?.ToString() ?? "Not set"}");
+                Console.WriteLine($"   Calculated SWAG: {totalSwag}");
+
+                if (featuresWithoutSwag > 0)
+                {
+                    Console.WriteLine($"   ⚠️  Warning: {featuresWithoutSwag} Features have no SWAG value");
+                }
+
+                if (isAutoGenerated)
+                {
+                    // For auto-generated Release Trains: always update SWAG in status notes to match sum of features
+                    Console.WriteLine($"   🔄 Updating SWAG in status notes to {totalSwag} (was {currentSwagFromStatusNotes?.ToString() ?? "unset"})");
+                    await _services.AzureDevOps.UpdateWorkItemStatusNotesWithSwagAsync(releaseTrain.Id, totalSwag, releaseTrain.StatusNotes);
+                    updatedCount++;
+
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing SWAG updates for Release Train {Id}", releaseTrain.Id);
+                Console.WriteLine($"❌ Error processing Release Train #{releaseTrain.Id}: {ex.Message}");
+            }
+        }
+
+        // Display summary
+        Console.WriteLine("\n" + "=".PadRight(ConsoleSeparatorWidth, '='));
+        Console.WriteLine("SWAG UPDATES SUMMARY");
+        Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
+        Console.WriteLine($"Release Trains processed: {releaseTrains.Count}");
+        Console.WriteLine($"Auto-generated Release Trains updated: {updatedCount}");
+        Console.WriteLine($"Manual Release Trains with SWAG mismatches: {warningCount}");
+        Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
+        Console.WriteLine();
+    }
+
     private static CommandLineOptions ParseArguments(string[] args)
     {
         var options = new CommandLineOptions();
@@ -239,6 +379,9 @@ public class RoadmapApplication
                 case "--create-roadmap" or "--roadmap":
                     options.CreateRoadmap = true;
                     break;
+                case "--swag-updates" or "--swag":
+                    options.SwagUpdates = true;
+                    break;
                 case "--help" or "-h":
                     ShowHelp();
                     Environment.Exit(0);
@@ -252,7 +395,7 @@ public class RoadmapApplication
     {
         Console.WriteLine("CreateRoadmapADO - Generate roadmaps from Azure DevOps Feature work items");
         Console.WriteLine();
-        Console.WriteLine("Usage: CreateRoadmapADO --area-path <path> (--hygiene-checks | --create-roadmap) [options]");
+        Console.WriteLine("Usage: CreateRoadmapADO --area-path <path> (--hygiene-checks | --create-roadmap | --swag-updates) [options]");
         Console.WriteLine();
         Console.WriteLine("Required:");
         Console.WriteLine("  -a, --area-path <path>    Azure DevOps area path to filter work items (e.g., \"SPOOL\\\\Resource Provider\")");
@@ -260,6 +403,7 @@ public class RoadmapApplication
         Console.WriteLine("Operations (at least one required):");
         Console.WriteLine("  --hygiene-checks          Run ADO hygiene checks on Release Trains and Features");
         Console.WriteLine("  --create-roadmap          Generate roadmap and create Release Train work items from patterns");
+        Console.WriteLine("  --swag-updates            Review Release Trains and manage SWAG calculations");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  -l, --limit <number>      Maximum number of work items to retrieve (default: 100)");
@@ -273,11 +417,19 @@ public class RoadmapApplication
         Console.WriteLine("  # Run hygiene checks only");
         Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-checks");
         Console.WriteLine();
-        Console.WriteLine("  # Run both operations in summary mode");
+        Console.WriteLine("  # Update SWAG values for Release Trains");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --swag-updates");
+        Console.WriteLine();
+        Console.WriteLine("  # Run multiple operations in summary mode");
         Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --create-roadmap --hygiene-checks --summary");
         Console.WriteLine();
         Console.WriteLine("  # Process more items");
         Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --create-roadmap --limit 200");
+        Console.WriteLine(); Console.WriteLine("SWAG Updates Operation:");
+        Console.WriteLine("  • For auto-generated Release Trains: Updates SWAG in status notes to sum of related Features");
+        Console.WriteLine("  • For manual Release Trains: Shows warnings if SWAG in status notes doesn't match Feature sum");
+        Console.WriteLine("  • Only processes Release Trains with related Feature work items");
+        Console.WriteLine("  • SWAG values are stored as [SWAG: value] prefix in the status notes field");
     }
 
     /// <summary>
@@ -482,6 +634,7 @@ public class CommandLineOptions
     public bool RunHygieneChecks { get; set; } = false;
     public bool CreateRoadmap { get; set; } = false;
     public bool Summary { get; set; } = false;
+    public bool SwagUpdates { get; set; } = false;
 
     /// <summary>
     /// Parse command line arguments into options
@@ -513,10 +666,12 @@ public class CommandLineOptions
                 case "--create-roadmap" or "--roadmap":
                     options.CreateRoadmap = true;
                     break;
+                case "--swag-updates" or "--swag":
+                    options.SwagUpdates = true;
+                    break;
                 case "--help" or "-h":
                     RoadmapApplication.ShowHelp();
-                    Environment.Exit(0);
-                    break;
+                    Environment.Exit(0); break;
             }
         }
 

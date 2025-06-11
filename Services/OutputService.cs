@@ -151,29 +151,11 @@ public class OutputService
             stackRank = "N/A (!)"; // Make missing values stand out
         }
         // Format display in table-like structure
-        Console.WriteLine($"{item.Id,-5} {stackRank,-12} {item.Type,-10} {item.Status,-12} {TruncateString(item.Title, 40),-40}");
-
-        // Show description on next line with indentation
+        Console.WriteLine($"{item.Id,-5} {stackRank,-12} {item.Type,-10} {item.Status,-12} {TruncateString(item.Title, 40),-40}");        // Show description on next line with indentation
         Console.WriteLine($"      Description: {TruncateString(item.Description, 72)}");
-
-        // Show additional details only if they have values
-        if (item.Priority.HasValue)
-        {
-            Console.WriteLine($"      Priority: {item.Priority}");
-        }
-        else
-        {
-            Console.WriteLine($"      Priority: Not set");
-        }
 
         // Always show StackRank info with details about how it affects sorting
         Console.WriteLine($"      StackRank: {(item.StackRank.HasValue ? $"{item.StackRank:F2} (lower values appear first)" : "Not set - will appear at the end")}");
-
-        if (item.StartDate.HasValue)
-        {
-            Console.WriteLine($"      Timeline: {item.StartDate:yyyy-MM-dd} to {item.EndDate:yyyy-MM-dd}");
-        }
-
 
         if (item.Dependencies.Any())
         {
