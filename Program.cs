@@ -8,12 +8,12 @@ using Microsoft.Extensions.Logging;
 // Parse arguments early to configure logging appropriately
 var earlyOptions = ParseEarlyArguments(args);
 
-// Setup logging with appropriate level based on output format
+// Setup logging with appropriate level based on summary mode
 using var loggerFactory = LoggerFactory.Create(builder =>
 {
     builder.AddConsole();
     // Use Warning level for summary mode to reduce noise
-    var logLevel = earlyOptions.OutputFormat == "summary" ? LogLevel.Warning : LogLevel.Information;
+    var logLevel = earlyOptions.Summary ? LogLevel.Warning : LogLevel.Information;
     builder.SetMinimumLevel(logLevel);
 });
 
@@ -73,12 +73,8 @@ static CommandLineOptions ParseEarlyArguments(string[] args)
     {
         switch (args[i].ToLowerInvariant())
         {
-            case "--output" or "-o":
-                if (i + 1 < args.Length)
-                    options.OutputFormat = args[++i];
-                break;
-            case "--summary-only" or "-s":
-                options.OutputFormat = "summary";
+            case "--summary" or "-s":
+                options.Summary = true;
                 break;
         }
     }
@@ -131,15 +127,12 @@ public class RoadmapApplication
                 Console.WriteLine();
                 ShowHelp();
                 return;
-            }
-
-            // Only show startup message if not in summary mode
-            if (options.OutputFormat != "summary")
+            }            // Only show startup message if not in summary mode
+            if (!options.Summary)
             {
                 _logger.LogInformation("Starting CreateRoadmapADO application");
-            }            // Retrieve work items from Azure DevOps
-            IEnumerable<WorkItem> workItems;
-            if (options.OutputFormat != "summary")
+            }// Retrieve work items from Azure DevOps
+            IEnumerable<WorkItem> workItems; if (!options.Summary)
             {
                 if (options.RunHygieneChecks)
                 {
@@ -165,7 +158,7 @@ public class RoadmapApplication
             }
             if (!workItems.Any())
             {
-                if (options.OutputFormat != "summary")
+                if (!options.Summary)
                 {
                     _logger.LogInformation("No work items found in area path '{AreaPath}'.", options.AreaPath);
                 }
@@ -177,7 +170,7 @@ public class RoadmapApplication
             }
 
             // Only show processing messages if not in summary mode and roadmap is requested
-            if (options.OutputFormat != "summary" && options.CreateRoadmap)
+            if (!options.Summary && options.CreateRoadmap)
             {
                 _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
                 Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
@@ -189,7 +182,7 @@ public class RoadmapApplication
             {
                 roadmapItems = await _roadmapService.GenerateRoadmapAsync(workItems);
 
-                if (options.OutputFormat != "summary")
+                if (!options.Summary)
                 {
                     Console.WriteLine("\nFinished processing special title patterns\n");
                 }
@@ -199,22 +192,19 @@ public class RoadmapApplication
             }            // Run hygiene checks if requested
             if (options.RunHygieneChecks)
             {
-                if (options.OutputFormat != "summary")
+                if (!options.Summary)
                 {
                     Console.WriteLine("\n" + "=".PadRight(60, '='));
                     Console.WriteLine("RUNNING ADO HYGIENE CHECKS");
                     Console.WriteLine("=".PadRight(60, '='));
                     _logger.LogInformation("Starting ADO hygiene checks on {Count} work items", workItems.Count());
                 }
-
                 var hygieneResults = await _hygieneService.PerformHygieneChecksAsync(workItems);
-                await DisplayHygieneCheckResults(hygieneResults, options);
-            }
-
-            // Output roadmap if requested and not in summary mode
-            if (options.OutputFormat != "summary" && options.CreateRoadmap)
+                DisplayHygieneCheckResults(hygieneResults, options);
+            }            // Output roadmap if requested and not in summary mode
+            if (!options.Summary && options.CreateRoadmap)
             {
-                await OutputRoadmapAsync(roadmapItems, options);
+                _outputService.DisplayInConsole(roadmapItems);
                 _logger.LogInformation("Application completed successfully");
             }
         }
@@ -233,14 +223,6 @@ public class RoadmapApplication
         {
             switch (args[i].ToLowerInvariant())
             {
-                case "--output" or "-o":
-                    if (i + 1 < args.Length)
-                        options.OutputFormat = args[++i];
-                    break;
-                case "--file" or "-f":
-                    if (i + 1 < args.Length)
-                        options.OutputFile = args[++i];
-                    break;
                 case "--limit" or "-l":
                     if (i + 1 < args.Length && int.TryParse(args[++i], out var limit))
                         options.Limit = limit;
@@ -249,8 +231,8 @@ public class RoadmapApplication
                     if (i + 1 < args.Length)
                         options.AreaPath = args[++i];
                     break;
-                case "--summary-only" or "-s":
-                    options.OutputFormat = "summary";
+                case "--summary" or "-s":
+                    options.Summary = true;
                     break;
                 case "--hygiene-checks" or "--hygiene":
                     options.RunHygieneChecks = true;
@@ -267,29 +249,6 @@ public class RoadmapApplication
 
         return options;
     }
-
-    private async Task OutputRoadmapAsync(IEnumerable<CreateRoadmapADO.Models.RoadmapItem> roadmapItems, CommandLineOptions options)
-    {
-        switch (options.OutputFormat.ToLowerInvariant())
-        {
-            case "json":
-                var jsonFile = options.OutputFile ?? $"roadmap_{DateTime.Now:yyyyMMdd_HHmmss}.json";
-                await _outputService.ExportToJsonAsync(roadmapItems, jsonFile);
-                Console.WriteLine($"Roadmap exported to: {jsonFile}");
-                break;
-
-            case "csv":
-                var csvFile = options.OutputFile ?? $"roadmap_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-                await _outputService.ExportToCsvAsync(roadmapItems, csvFile);
-                Console.WriteLine($"Roadmap exported to: {csvFile}");
-                break;
-
-            case "console":
-            default:
-                _outputService.DisplayInConsole(roadmapItems);
-                break;
-        }
-    }
     private static void ShowHelp()
     {
         Console.WriteLine("CreateRoadmapADO - Generate roadmaps from Azure DevOps Feature work items");
@@ -305,7 +264,7 @@ public class RoadmapApplication
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  -l, --limit <number>      Maximum number of work items to retrieve (default: 100)");
-        Console.WriteLine("  -o, --output <format>     Output format: console, json, csv, summary (default: console)"); Console.WriteLine("  -f, --file <path>         Output file path (auto-generated if not specified)");
+        Console.WriteLine("  -s, --summary             Enable summary mode (reduced output for automation)");
         Console.WriteLine("  -h, --help                Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
@@ -315,14 +274,11 @@ public class RoadmapApplication
         Console.WriteLine("  # Run hygiene checks only");
         Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-checks");
         Console.WriteLine();
-        Console.WriteLine("  # Run both operations");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --create-roadmap --hygiene-checks --output summary");
+        Console.WriteLine("  # Run both operations in summary mode");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --create-roadmap --hygiene-checks --summary");
         Console.WriteLine();
-        Console.WriteLine("  # Export roadmap to JSON");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --create-roadmap --limit 50 --output json");
-        Console.WriteLine();
-        Console.WriteLine("  # Export hygiene results to file");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-checks --file hygiene-report.json");
+        Console.WriteLine("  # Process more items");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --create-roadmap --limit 200");
     }
 
     /// <summary>
@@ -380,14 +336,12 @@ public class RoadmapApplication
 
         Console.WriteLine("=".PadRight(60, '='));
         Console.WriteLine();
-    }
-
-    /// <summary>
-    /// Displays hygiene check results in a formatted manner
-    /// </summary>
-    /// <param name="hygieneResults">The hygiene check results to display</param>
-    /// <param name="options">Command line options for output formatting</param>
-    private async Task DisplayHygieneCheckResults(HygieneCheckSummary hygieneResults, CommandLineOptions options)
+    }    /// <summary>
+         /// Displays hygiene check results in a formatted manner
+         /// </summary>
+         /// <param name="hygieneResults">The hygiene check results to display</param>
+         /// <param name="options">Command line options for output formatting</param>
+    private void DisplayHygieneCheckResults(HygieneCheckSummary hygieneResults, CommandLineOptions options)
     {        // Display summary
         Console.WriteLine();
         Console.WriteLine("HYGIENE CHECK SUMMARY");
@@ -450,13 +404,6 @@ public class RoadmapApplication
                 Console.WriteLine();
             }
         }
-
-        // Export to file if requested
-        if (!string.IsNullOrEmpty(options.OutputFile))
-        {
-            await _outputService.ExportHygieneCheckResultsAsync(hygieneResults, options.OutputFile);
-            Console.WriteLine($"Hygiene check results exported to: {options.OutputFile}");
-        }
     }
 
     /// <summary>
@@ -483,9 +430,8 @@ public class RoadmapApplication
 public class CommandLineOptions
 {
     public int Limit { get; set; } = 100;
-    public string OutputFormat { get; set; } = "console";
-    public string? OutputFile { get; set; }
     public string? AreaPath { get; set; }
     public bool RunHygieneChecks { get; set; } = false;
     public bool CreateRoadmap { get; set; } = false;
+    public bool Summary { get; set; } = false;
 }
