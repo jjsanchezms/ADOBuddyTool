@@ -98,26 +98,26 @@ public class OutputService
             var items = roadmapItems.ToList();
             _logger.LogInformation("Displaying {Count} roadmap items in console", items.Count);
 
-            // Console.WriteLine();
-            // Console.WriteLine("=== ROADMAP (Sorted by StackRank) ===");
-            // Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine("=== ROADMAP (Sorted by StackRank) ===");
+            Console.WriteLine();
 
-            // if (!items.Any())
-            // {
-            //     Console.WriteLine("No roadmap items found.");
-            //     return;
-            // }
+            if (!items.Any())
+            {
+                Console.WriteLine("No roadmap items found.");
+                return;
+            }
 
-            // // Display table header with improved clarity
-            // Console.WriteLine($"{"ID",-5} {"StackRank",-12} {"Type",-10} {"Status",-12} {"Title",-40}");
-            // Console.WriteLine("(Lower StackRank values appear first, items with N/A appear last)");
-            // Console.WriteLine(new string('=', 80));
+            // Display table header with improved clarity
+            Console.WriteLine($"{"ID",-5} {"StackRank",-12} {"Type",-10} {"Status",-12} {"Title",-40}");
+            Console.WriteLine("(Lower StackRank values appear first, items with N/A appear last)");
+            Console.WriteLine(new string('=', 80));
 
-            // foreach (var item in items)
-            // {
-            //     DisplayRoadmapItem(item);
-            //     Console.WriteLine(new string('-', 80));
-            // }
+            foreach (var item in items)
+            {
+                DisplayRoadmapItem(item);
+                Console.WriteLine(new string('-', 80));
+            }
 
             Console.WriteLine();
             Console.WriteLine($"Total Items: {items.Count}");

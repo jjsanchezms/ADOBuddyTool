@@ -147,7 +147,7 @@ public class AzureDevOpsService : IAzureDevOpsService
     {
         try
         {
-            var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,Skype.StatusNotes,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank,Microsoft.VSTS.Scheduling.Effort";
+            var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,Skype.StatusNotes,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank,Skype.Swag";
             var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?fields={fields}&api-version=7.0";
 
             _logger.LogDebug("Making request to: {Url}", url);
@@ -394,7 +394,7 @@ public class AzureDevOpsService : IAzureDevOpsService
     private async Task<IEnumerable<WorkItem>> GetWorkItemsByIdsAsync(IEnumerable<int> workItemIds, CancellationToken cancellationToken)
     {
         var ids = string.Join(",", workItemIds);        // Include the fields parameter to ensure we get all necessary fields including IterationPath
-        var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,Skype.StatusNotes,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank,Microsoft.VSTS.Scheduling.Effort";
+        var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,Skype.StatusNotes,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank,Skype.Swag";
         var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems?ids={ids}&fields={fields}&api-version=7.0";
 
         _logger.LogDebug("Retrieving work items by IDs: {Ids}", ids);
@@ -507,10 +507,9 @@ public class AzureDevOpsService : IAzureDevOpsService
         }
         return null;
     }
-
     private static double? GetSwagValue(Dictionary<string, JsonElement> fields)
     {
-        var swagValue = GetFieldValue(fields, "Microsoft.VSTS.Scheduling.Effort");
+        var swagValue = GetFieldValue(fields, "Skype.Swag");
         if (swagValue != null && double.TryParse(swagValue, out var swag))
         {
             return swag;
@@ -641,14 +640,12 @@ public class AzureDevOpsService : IAzureDevOpsService
         {
             _logger.LogInformation("Updating work item #{WorkItemId} SWAG to: {SwagValue}", workItemId, swagValue);
 
-            var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?api-version=7.0";
-
-            var patchOperation = new[]
+            var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?api-version=7.0"; var patchOperation = new[]
             {
                 new
                 {
                     op = "replace",
-                    path = "/fields/Microsoft.VSTS.Scheduling.Effort",
+                    path = "/fields/Skype.Swag",
                     value = swagValue
                 }
             };
@@ -689,16 +686,8 @@ public class AzureDevOpsService : IAzureDevOpsService
             var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?api-version=7.0";            // Remove existing SWAG prefix if present and add new one
             var cleanStatusNotes = RemoveSwagPrefixFromDescription(originalStatusNotes);
 
-            // If status notes are empty after cleaning, create a meaningful SWAG-only message
-            string newStatusNotes;
-            if (string.IsNullOrWhiteSpace(cleanStatusNotes))
-            {
-                newStatusNotes = $"[SWAG: {swagValue}] Total effort estimate based on sum of related Features.";
-            }
-            else
-            {
-                newStatusNotes = $"[SWAG: {swagValue}]{cleanStatusNotes}";
-            }
+            // Add SWAG prefix to the cleaned status notes
+            string newStatusNotes = $"[SWAG: {swagValue}]{cleanStatusNotes}";
             var patchOperation = new[]
             {
                 new
@@ -784,6 +773,40 @@ public class AzureDevOpsService : IAzureDevOpsService
             }
         }
         return workItems;
+    }
+
+    #endregion
+
+    #region SWAG Specific Methods
+
+    public async Task<IEnumerable<WorkItem>> GetWorkItemsForSwagUpdatesAsync(int limit, string areaPath, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // WIQL query to retrieve both Feature and Release Train work items for SWAG updates
+            // Include closed Features since completed work should count toward SWAG calculations
+            var wiqlQuery = $"SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] IN ('Feature', 'Release Train') AND [System.AreaPath] UNDER '{areaPath}' AND [System.State] NOT IN ('Removed') ORDER BY [Microsoft.VSTS.Common.StackRank] ASC, [System.Id] ASC";
+            var workItemIds = await ExecuteWiqlQueryAsync(wiqlQuery, cancellationToken);
+
+            // Take only the requested number of IDs
+            var limitedIds = workItemIds.Take(Math.Min(limit, 1000));
+
+            if (!limitedIds.Any())
+            {
+                _logger.LogInformation("No Feature or Release Train work items found for SWAG updates.");
+                return Enumerable.Empty<WorkItem>();
+            }
+
+            _logger.LogInformation("Found {Count} Feature/Release Train work items for SWAG updates (including closed), retrieving {Limit}", workItemIds.Count(), limitedIds.Count());
+
+            // Get the full work item details with relations for SWAG updates
+            return await GetWorkItemsWithRelationsByIdsAsync(limitedIds, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving work items for SWAG updates");
+            throw;
+        }
     }
 
     #endregion

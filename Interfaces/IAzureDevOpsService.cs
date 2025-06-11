@@ -105,4 +105,13 @@ public interface IAzureDevOpsService : IDisposable
     /// <param name="comment">Optional comment for the relation</param>
     /// <returns>Task representing the asynchronous operation</returns>
     Task CreateRelationAsync(int sourceId, int targetId, string comment = "");
+
+    /// <summary>
+    /// Retrieves both Feature and Release Train work items for SWAG updates, including closed Features
+    /// </summary>
+    /// <param name="limit">Maximum number of work items to retrieve</param>
+    /// <param name="areaPath">Area path to filter work items</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Collection of Feature and Release Train work items including closed Features</returns>
+    Task<IEnumerable<WorkItem>> GetWorkItemsForSwagUpdatesAsync(int limit, string areaPath, CancellationToken cancellationToken = default);
 }
