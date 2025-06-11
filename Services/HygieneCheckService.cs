@@ -55,7 +55,7 @@ public class HygieneCheckService
         _releaseTrainCompletenessCheck = releaseTrainCompletenessCheck ?? throw new ArgumentNullException(nameof(releaseTrainCompletenessCheck));
         _statusNotesCheck = statusNotesCheck ?? throw new ArgumentNullException(nameof(statusNotesCheck));
         _featureStateConsistencyCheck = featureStateConsistencyCheck ?? throw new ArgumentNullException(nameof(featureStateConsistencyCheck));
-    }/// <summary>
+    }    /// <summary>
     /// Determines if a Release Train title follows a separator/placeholder pattern that should be ignored for hygiene checks.
     /// These are typically formatting elements like "----------------------------- CY25 -----------------------------"
     /// </summary>
@@ -68,17 +68,10 @@ public class HygieneCheckService
 
         var cleanTitle = title.Trim();
         
-        // Check if title contains mostly dashes and/or percent signs with minimal text content
-        // Pattern examples: "-------- CY25 --------", "%%%%% Q1 %%%%%", "--- FY25 ---"
-        var dashCount = cleanTitle.Count(c => c == '-');
-        var percentCount = cleanTitle.Count(c => c == '%');
-        var separatorCount = dashCount + percentCount;
-        
-        // If more than 60% of the title is separators (dashes/percents), consider it a separator pattern
-        var separatorRatio = (double)separatorCount / cleanTitle.Length;
-        
-        return separatorRatio > 0.6;
-    }    /// <summary>
+        // Check if title starts with dashes (separator pattern)
+        // Pattern examples: "--- Sprint Planning ---", "----------------------------- CY25 -----------------------------"
+        return cleanTitle.StartsWith("---");
+    }/// <summary>
     /// Performs comprehensive hygiene checks on Release Trains and Features.
     /// This method is the main entry point for all ADO hygiene validation checks.
     /// 
