@@ -14,43 +14,40 @@ namespace CreateRoadmapADO.Services.HygieneChecks;
 /// This helps ensure project stakeholders have sufficient information for decision-making
 /// and status reporting.
 /// </summary>
-public class StatusNotesDocumentationCheck : IHygieneCheck
+public class StatusNotesDocumentationCheck : BaseHygieneCheck
 {
-    private readonly ILogger<StatusNotesDocumentationCheck> _logger;
+    public override string CheckName => "Status Notes Currency";
+    public override string CheckDescription => "Check if Release Train has adequate status notes/description";
 
-    public string CheckName => "Status Notes Currency";
-    public string CheckDescription => "Check if Release Train has adequate status notes/description";
-
-    public StatusNotesDocumentationCheck(ILogger<StatusNotesDocumentationCheck> logger)
+    public StatusNotesDocumentationCheck(ILogger<StatusNotesDocumentationCheck> logger) : base(logger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }    public Task<IEnumerable<HygieneCheckResult>> PerformCheckAsync(HygieneCheckContext context, CancellationToken cancellationToken = default)
+    }
+    public override Task<IEnumerable<HygieneCheckResult>> PerformCheckAsync(HygieneCheckContext context, CancellationToken cancellationToken = default)
     {
         var releaseTrain = context.WorkItem;
 
         _logger.LogDebug("Checking status documentation for Release Train {Id}: {Title}", releaseTrain.Id, releaseTrain.Title);
 
-        // Check Release Train description
+        // Simple validation logic
         var hasDescription = !string.IsNullOrWhiteSpace(releaseTrain.Description);
         var descriptionLength = releaseTrain.Description?.Trim().Length ?? 0;
+        var isAdequate = hasDescription && descriptionLength > 20;
 
-        var releaseTrainResult = new HygieneCheckResult
-        {
-            CheckName = CheckName,
-            Passed = hasDescription && descriptionLength > 20,
-            Severity = hasDescription && descriptionLength > 20 ? HygieneCheckSeverity.Info : HygieneCheckSeverity.Warning,
-            Description = CheckDescription,
-            Details = hasDescription 
-                ? $"Description present ({descriptionLength} characters)"
-                : "No description provided",
-            WorkItemId = releaseTrain.Id,
-            WorkItemTitle = releaseTrain.Title,
-            WorkItemUrl = HygieneCheckContext.GenerateWorkItemUrl(releaseTrain.Id),
-            Recommendation = hasDescription && descriptionLength > 20
-                ? "Status documentation looks adequate"
-                : "Consider adding detailed status notes or description to provide context and current status"
-        };
+        var details = hasDescription
+            ? $"Description present ({descriptionLength} characters)"
+            : "No description provided";
 
-        return Task.FromResult<IEnumerable<HygieneCheckResult>>(new[] { releaseTrainResult });
+        var recommendation = isAdequate
+            ? "Status documentation looks adequate"
+            : "Consider adding detailed status notes or description to provide context and current status";
+
+        var result = CreateResult(
+            releaseTrain,
+            isAdequate,
+            isAdequate ? HygieneCheckSeverity.Info : HygieneCheckSeverity.Warning,
+            details,
+            recommendation);
+
+        return Task.FromResult<IEnumerable<HygieneCheckResult>>(new[] { result });
     }
 }

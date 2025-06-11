@@ -1,31 +1,31 @@
 using CreateRoadmapADO.Configuration;
+using CreateRoadmapADO.Constants;
+using CreateRoadmapADO.Helpers;
 using CreateRoadmapADO.Interfaces;
 using CreateRoadmapADO.Models;
 using CreateRoadmapADO.Services;
 using CreateRoadmapADO.Services.HygieneChecks;
 using Microsoft.Extensions.Logging;
 
-// Parse arguments early to configure logging appropriately
-var earlyOptions = ParseEarlyArguments(args);
+// Parse arguments to configure logging appropriately
+var options = CommandLineOptions.Parse(args);
 
 // Setup logging with appropriate level based on summary mode
 using var loggerFactory = LoggerFactory.Create(builder =>
 {
     builder.AddConsole();
     // Use Warning level for summary mode to reduce noise
-    var logLevel = earlyOptions.Summary ? LogLevel.Warning : LogLevel.Information;
+    var logLevel = options.Summary ? LogLevel.Warning : LogLevel.Information;
     builder.SetMinimumLevel(logLevel);
 });
 
 try
 {
     // Create logger for the application
-    var logger = loggerFactory.CreateLogger<RoadmapApplication>();
-
-    // Create services using simplified container
+    var logger = loggerFactory.CreateLogger<RoadmapApplication>();    // Create services using simplified container
     var services = new ServiceContainer(loggerFactory);
     var app = new RoadmapApplication(services, logger);
-    await app.RunAsync(args);
+    await app.RunAsync(options);
 
     // Cleanup
     services.AzureDevOps.Dispose();
@@ -38,34 +38,12 @@ catch (Exception ex)
 }
 
 /// <summary>
-/// Early parsing of arguments for logging configuration
-/// </summary>
-/// <param name="args">Command line arguments</param>
-/// <returns>Basic command line options</returns>
-static CommandLineOptions ParseEarlyArguments(string[] args)
-{
-    var options = new CommandLineOptions();
-
-    for (int i = 0; i < args.Length; i++)
-    {
-        switch (args[i].ToLowerInvariant())
-        {
-            case "--summary" or "-s":
-                options.Summary = true;
-                break;
-        }
-    }
-
-    return options;
-}
-
-/// <summary>
 /// Main application class
 /// </summary>
 public class RoadmapApplication
 {
     // Constants for better readability - replace magic numbers with meaningful names
-    private const int ConsoleSeparatorWidth = 60;  // Width for console formatting separators
+    private const int ConsoleSeparatorWidth = AppConstants.Console.SeparatorWidth;
 
     private readonly ServiceContainer _services;
     private readonly ILogger<RoadmapApplication> _logger;
@@ -75,14 +53,12 @@ public class RoadmapApplication
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
-
-    public async Task RunAsync(string[] args)
+    public async Task RunAsync(CommandLineOptions options)
     {
         try
         {
-            var options = ParseArguments(args);
-
             if (!ValidateOptions(options)) return;
+            if (!ValidateAzureDevOpsConfiguration(options)) return;
 
             if (!options.Summary)
             {
@@ -97,6 +73,18 @@ public class RoadmapApplication
             }
 
             await ProcessOperationsAsync(workItems, options);
+        }
+        catch (HttpRequestException httpEx) when (AuthenticationHelper.IsTokenExpiredError(httpEx.Message))
+        {
+            _logger.LogError(httpEx, "Authentication error - token appears expired");
+            Console.WriteLine();
+            Console.WriteLine("🔐 AUTHENTICATION ERROR - TOKEN EXPIRED");
+            Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
+            Console.WriteLine("Your Personal Access Token has expired or is invalid.");
+            Console.WriteLine();
+
+            AuthenticationHelper.DisplayTokenInstructions();
+            Environment.Exit(1);
         }
         catch (Exception ex)
         {
@@ -126,28 +114,29 @@ public class RoadmapApplication
 
         return true;
     }
-
     private async Task<IEnumerable<WorkItem>> GetWorkItemsAsync(CommandLineOptions options)
     {
-        if (!options.Summary)
-        {
-            if (options.RunHygieneChecks)
-            {
-                _logger.LogInformation("Retrieving Feature and Release Train work items for hygiene checks (limit: {Limit}, area path: {AreaPath})",
-                    options.Limit, options.AreaPath);
-            }
-            else if (options.CreateRoadmap)
-            {
-                _logger.LogInformation("Retrieving Feature work items for roadmap generation (limit: {Limit}, area path: {AreaPath})",
-                    options.Limit, options.AreaPath);
-            }
-        }
+        LogWorkItemRetrieval(options);
 
         return options.RunHygieneChecks
             ? await _services.AzureDevOps.GetWorkItemsForHygieneChecksAsync(options.Limit, options.AreaPath!)
             : await _services.AzureDevOps.GetWorkItemsAsync(options.Limit, options.AreaPath!);
     }
 
+    /// <summary>
+    /// Logs the work item retrieval operation if not in summary mode
+    /// </summary>
+    /// <param name="options">Command line options</param>
+    private void LogWorkItemRetrieval(CommandLineOptions options)
+    {
+        if (options.Summary) return;
+
+        var operationType = options.RunHygieneChecks ? "hygiene checks" : "roadmap generation";
+        var workItemTypes = GetWorkItemTypeDescription(options);
+
+        _logger.LogInformation("Retrieving {WorkItemTypes} for {OperationType} (limit: {Limit}, area path: {AreaPath})",
+            workItemTypes, operationType, options.Limit, options.AreaPath);
+    }
     private void HandleNoWorkItemsFound(CommandLineOptions options)
     {
         if (!options.Summary)
@@ -155,10 +144,20 @@ public class RoadmapApplication
             _logger.LogInformation("No work items found in area path '{AreaPath}'.", options.AreaPath);
         }
 
-        string workItemTypeDescription = options.RunHygieneChecks
+        var workItemTypeDescription = GetWorkItemTypeDescription(options);
+        Console.WriteLine($"No {workItemTypeDescription} found in area path '{options.AreaPath}'.");
+    }
+
+    /// <summary>
+    /// Gets a user-friendly description of work item types based on options
+    /// </summary>
+    /// <param name="options">Command line options</param>
+    /// <returns>Description of work item types being processed</returns>
+    private static string GetWorkItemTypeDescription(CommandLineOptions options)
+    {
+        return options.RunHygieneChecks
             ? "Feature or Release Train work items"
             : "Feature work items";
-        Console.WriteLine($"No {workItemTypeDescription} found in area path '{options.AreaPath}'.");
     }
 
     private async Task ProcessOperationsAsync(IEnumerable<WorkItem> workItems, CommandLineOptions options)
@@ -249,8 +248,7 @@ public class RoadmapApplication
 
         return options;
     }
-
-    private static void ShowHelp()
+    public static void ShowHelp()
     {
         Console.WriteLine("CreateRoadmapADO - Generate roadmaps from Azure DevOps Feature work items");
         Console.WriteLine();
@@ -360,9 +358,7 @@ public class RoadmapApplication
         if (hygieneResults.ErrorIssues > 0)
             Console.WriteLine($"Error Issues: {hygieneResults.ErrorIssues} 🟠");
         if (hygieneResults.WarningIssues > 0)
-            Console.WriteLine($"Warning Issues: {hygieneResults.WarningIssues} 🟡");
-
-        // Display breakdown by check type for failed checks
+            Console.WriteLine($"Warning Issues: {hygieneResults.WarningIssues} 🟡");        // Display breakdown by check type for failed checks
         var failedChecksByType = hygieneResults.CheckResults
             .Where(r => !r.Passed)
             .GroupBy(r => r.CheckName)
@@ -385,29 +381,35 @@ public class RoadmapApplication
         Console.WriteLine();
 
         // Display failed checks in detail
-        var failedChecks = hygieneResults.CheckResults.Where(r => !r.Passed).ToList();
-        if (failedChecks.Any())
+        var failedChecks = hygieneResults.CheckResults.Where(r => !r.Passed).ToList(); if (failedChecks.Any())
         {
             Console.WriteLine("FAILED CHECKS");
-            Console.WriteLine("-".PadRight(ConsoleSeparatorWidth, '-'));
-
-            foreach (var check in failedChecks.OrderByDescending(c => c.Severity))
+            Console.WriteLine("-".PadRight(ConsoleSeparatorWidth, '-')); foreach (var check in failedChecks.OrderByDescending(c => c.Severity))
             {
-                var severityIcon = check.Severity switch
-                {
-                    HygieneCheckSeverity.Critical => "🔴",
-                    HygieneCheckSeverity.Error => "🟠",
-                    HygieneCheckSeverity.Warning => "🟡",
-                    _ => "ℹ️"
-                };
+                var severityIcon = GetSeverityIcon(check.Severity);
                 Console.WriteLine($"{severityIcon} [{check.Severity.ToString().ToUpper()}] {check.CheckName}");
                 Console.WriteLine($"   Work Item: #{check.WorkItemId} - {check.WorkItemTitle}");
                 Console.WriteLine($"   URL: {check.WorkItemUrl}");
                 Console.WriteLine($"   Issue: {check.Details}");
-                Console.WriteLine($"   Recommendation: {check.Recommendation}");
-                Console.WriteLine();
+                Console.WriteLine($"   Recommendation: {check.Recommendation}"); Console.WriteLine();
             }
         }
+    }
+
+    /// <summary>
+    /// Gets the icon for a hygiene check severity level
+    /// </summary>
+    /// <param name="severity">The severity level</param>
+    /// <returns>Icon representing the severity</returns>
+    private static string GetSeverityIcon(HygieneCheckSeverity severity)
+    {
+        return severity switch
+        {
+            HygieneCheckSeverity.Critical => AppConstants.SeverityIcons.Critical,
+            HygieneCheckSeverity.Error => AppConstants.SeverityIcons.Error,
+            HygieneCheckSeverity.Warning => AppConstants.SeverityIcons.Warning,
+            _ => AppConstants.SeverityIcons.Info
+        };
     }
 
     /// <summary>
@@ -418,13 +420,55 @@ public class RoadmapApplication
     private static string GetMostSevereIcon(IGrouping<string, HygieneCheckResult> checkGroup)
     {
         var mostSevere = checkGroup.Max(c => c.Severity);
-        return mostSevere switch
+        return GetSeverityIcon(mostSevere);
+    }    /// <summary>
+         /// Validates Azure DevOps configuration and provides helpful error messages
+         /// </summary>
+         /// <param name="options">Command line options</param>
+         /// <returns>True if configuration appears valid, false otherwise</returns>
+    private bool ValidateAzureDevOpsConfiguration(CommandLineOptions options)
+    {
+        var config = ConfigurationReader.GetAzureDevOpsOptions();
+
+        if (string.IsNullOrWhiteSpace(config.PersonalAccessToken))
         {
-            HygieneCheckSeverity.Critical => "🔴",
-            HygieneCheckSeverity.Error => "🟠",
-            HygieneCheckSeverity.Warning => "🟡",
-            _ => "ℹ️"
-        };
+            Console.WriteLine();
+            Console.WriteLine("❌ CONFIGURATION ERROR - Missing Token");
+            Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
+            Console.WriteLine("Personal Access Token is missing from appsettings.json");
+            AuthenticationHelper.DisplayTokenInstructions();
+            return false;
+        }
+
+        if (!AuthenticationHelper.IsTokenFormatValid(config.PersonalAccessToken))
+        {
+            Console.WriteLine();
+            Console.WriteLine("⚠️  CONFIGURATION WARNING - Invalid Token Format");
+            Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
+            Console.WriteLine("Your Personal Access Token appears to have an invalid format.");
+            Console.WriteLine("Azure DevOps tokens are typically 52 characters long and contain only letters and numbers.");
+            Console.WriteLine();
+            Console.WriteLine("Current token length: " + config.PersonalAccessToken.Length);
+            Console.WriteLine();
+            AuthenticationHelper.DisplayTokenInstructions();
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(config.Organization) || string.IsNullOrWhiteSpace(config.Project))
+        {
+            Console.WriteLine();
+            Console.WriteLine("❌ CONFIGURATION ERROR - Missing Organization/Project");
+            Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
+            Console.WriteLine("Azure DevOps Organization or Project is missing from appsettings.json");
+            Console.WriteLine();
+            Console.WriteLine("Please update appsettings.json with your Azure DevOps details:");
+            Console.WriteLine($"  \"Organization\": \"your-org-name\"  (currently: \"{config.Organization ?? "not set"}\")");
+            Console.WriteLine($"  \"Project\": \"your-project-name\"     (currently: \"{config.Project ?? "not set"}\")");
+            Console.WriteLine();
+            return false;
+        }
+
+        return true;
     }
 }
 
@@ -438,4 +482,44 @@ public class CommandLineOptions
     public bool RunHygieneChecks { get; set; } = false;
     public bool CreateRoadmap { get; set; } = false;
     public bool Summary { get; set; } = false;
+
+    /// <summary>
+    /// Parse command line arguments into options
+    /// </summary>
+    /// <param name="args">Command line arguments</param>
+    /// <returns>Parsed command line options</returns>
+    public static CommandLineOptions Parse(string[] args)
+    {
+        var options = new CommandLineOptions();
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i].ToLowerInvariant())
+            {
+                case "--limit" or "-l":
+                    if (i + 1 < args.Length && int.TryParse(args[++i], out var limit))
+                        options.Limit = limit;
+                    break;
+                case "--area-path" or "-a":
+                    if (i + 1 < args.Length)
+                        options.AreaPath = args[++i];
+                    break;
+                case "--summary" or "-s":
+                    options.Summary = true;
+                    break;
+                case "--hygiene-checks" or "--hygiene":
+                    options.RunHygieneChecks = true;
+                    break;
+                case "--create-roadmap" or "--roadmap":
+                    options.CreateRoadmap = true;
+                    break;
+                case "--help" or "-h":
+                    RoadmapApplication.ShowHelp();
+                    Environment.Exit(0);
+                    break;
+            }
+        }
+
+        return options;
+    }
 }

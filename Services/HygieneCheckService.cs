@@ -33,33 +33,20 @@ public class HygieneCheckService
     private readonly ILogger<HygieneCheckService> _logger;
 
     // Collection of all hygiene checks
-    private readonly List<IHygieneCheck> _checks;
-
-    /// <summary>
-    /// Initializes a new instance of the HygieneCheckService with required dependencies.
-    /// </summary>
-    /// <param name="azureDevOpsService">Service for Azure DevOps API operations</param>
-    /// <param name="logger">Logger for diagnostic information</param>
-    /// <param name="releaseTrainCompletenessCheck">Check for Release Train completeness</param>
-    /// <param name="statusNotesCheck">Check for status documentation</param>
-    /// <param name="featureStateConsistencyCheck">Check for feature state consistency</param>
+    private readonly List<IHygieneCheck> _checks;    /// <summary>
+                                                     /// Initializes a new instance of the HygieneCheckService with required dependencies.
+                                                     /// </summary>
+                                                     /// <param name="azureDevOpsService">Service for Azure DevOps API operations</param>
+                                                     /// <param name="logger">Logger for diagnostic information</param>
+                                                     /// <param name="checks">Collection of hygiene checks to perform</param>
     public HygieneCheckService(
         IAzureDevOpsService azureDevOpsService,
         ILogger<HygieneCheckService> logger,
-        ReleaseTrainCompletenessCheck releaseTrainCompletenessCheck,
-        StatusNotesDocumentationCheck statusNotesCheck,
-        FeatureStateConsistencyCheck featureStateConsistencyCheck)
+        IEnumerable<IHygieneCheck> checks)
     {
         _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        // Group all checks into a single collection for easier management
-        _checks = new List<IHygieneCheck>
-        {
-            releaseTrainCompletenessCheck ?? throw new ArgumentNullException(nameof(releaseTrainCompletenessCheck)),
-            statusNotesCheck ?? throw new ArgumentNullException(nameof(statusNotesCheck)),
-            featureStateConsistencyCheck ?? throw new ArgumentNullException(nameof(featureStateConsistencyCheck))
-        };
+        _checks = checks?.ToList() ?? throw new ArgumentNullException(nameof(checks));
     }/// <summary>
      /// Determines if a Release Train title follows a separator/placeholder pattern that should be ignored for hygiene checks.
      /// These are typically formatting elements like "----------------------------- CY25 -----------------------------"

@@ -13,7 +13,6 @@ public class ServiceContainer
     public RoadmapService Roadmap { get; }
     public OutputService Output { get; }
     public HygieneCheckService Hygiene { get; }
-
     public ServiceContainer(ILoggerFactory loggerFactory)
     {
         // Create all services with shared logger factory
@@ -23,13 +22,27 @@ public class ServiceContainer
 
         Output = new OutputService(loggerFactory.CreateLogger<OutputService>());
 
-        // Create hygiene check services
-        var iterationCheck = new IterationPathAlignmentCheck(loggerFactory.CreateLogger<IterationPathAlignmentCheck>());
-        var releaseTrainCheck = new ReleaseTrainCompletenessCheck(iterationCheck, loggerFactory.CreateLogger<ReleaseTrainCompletenessCheck>());
-        var statusNotesCheck = new StatusNotesDocumentationCheck(loggerFactory.CreateLogger<StatusNotesDocumentationCheck>());
-        var featureStateCheck = new FeatureStateConsistencyCheck(loggerFactory.CreateLogger<FeatureStateConsistencyCheck>());
+        // Create hygiene check services using factory method
+        Hygiene = CreateHygieneCheckService(loggerFactory);
+    }    /// <summary>
+         /// Creates and configures the hygiene check service with all required checks
+         /// </summary>
+         /// <param name="loggerFactory">Logger factory for creating individual loggers</param>
+         /// <returns>Configured hygiene check service</returns>
+    private HygieneCheckService CreateHygieneCheckService(ILoggerFactory loggerFactory)
+    {
+        // Create individual hygiene checks
+        var checks = new List<IHygieneCheck>
+        {
+            new IterationPathAlignmentCheck(loggerFactory.CreateLogger<IterationPathAlignmentCheck>()),
+            new StatusNotesDocumentationCheck(loggerFactory.CreateLogger<StatusNotesDocumentationCheck>()),
+            new FeatureStateConsistencyCheck(loggerFactory.CreateLogger<FeatureStateConsistencyCheck>())
+        };
 
-        Hygiene = new HygieneCheckService(AzureDevOps, loggerFactory.CreateLogger<HygieneCheckService>(),
-            releaseTrainCheck, statusNotesCheck, featureStateCheck);
+        // Add release train completeness check with its dependency
+        var iterationCheck = checks.OfType<IterationPathAlignmentCheck>().First();
+        checks.Add(new ReleaseTrainCompletenessCheck(iterationCheck, loggerFactory.CreateLogger<ReleaseTrainCompletenessCheck>()));
+
+        return new HygieneCheckService(AzureDevOps, loggerFactory.CreateLogger<HygieneCheckService>(), checks);
     }
 }

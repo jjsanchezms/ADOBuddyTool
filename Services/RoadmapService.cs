@@ -229,18 +229,15 @@ public class RoadmapService
         _logger.LogInformation("Updating existing Release Train #{Id} with {Count} children from current pattern group", existingWorkItemId, children.Count);
 
         // First, validate that the release train actually exists
-        _logger.LogInformation("Validating that Release Train #{Id} exists and is accessible", existingWorkItemId);
-
-        // Get existing work item with relations to check what already exists
+        _logger.LogInformation("Validating that Release Train #{Id} exists and is accessible", existingWorkItemId);        // Get existing work item with relations to check what already exists
         var existingWorkItem = await _azureDevOpsService.GetWorkItemWithRelationsAsync(existingWorkItemId);
         if (existingWorkItem == null)
         {
-            _logger.LogError("CRITICAL ERROR: Release Train #{Id} does not exist or is not accessible. Cannot create relations to non-existent work item.", existingWorkItemId);
-            _logger.LogError("This indicates a data integrity issue where the pattern references a work item ID that doesn't exist.");
-            _logger.LogWarning("AUTOMATIC RECOVERY: Creating a new Release Train instead of updating the non-existent one.");
+            _logger.LogInformation("Release Train #{Id} does not exist or is not accessible. This is expected when referencing a deleted or moved work item.", existingWorkItemId);
+            _logger.LogInformation("Initiating automatic recovery: Creating a new Release Train instead of updating the non-existent one.");
 
             // Instead of failing, create a new release train
-            Console.WriteLine($"❌ ERROR: Release Train #{existingWorkItemId} does not exist");
+            Console.WriteLine($"ℹ️  INFO: Release Train #{existingWorkItemId} does not exist");
             Console.WriteLine($"🔄 RECOVERY: Creating new Release Train instead"); try
             {
                 int newWorkItemId = await CreateNewWorkItemFromPattern(children, title, 0);

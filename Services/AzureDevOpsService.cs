@@ -2,6 +2,7 @@ using CreateRoadmapADO.Configuration;
 using CreateRoadmapADO.Interfaces;
 using CreateRoadmapADO.Models;
 using Microsoft.Extensions.Logging;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -378,13 +379,21 @@ public class AzureDevOpsService : IAzureDevOpsService
         _logger.LogInformation("Executing WIQL query: {Query}", wiqlQuery);
         _logger.LogDebug("Making request to URL: {Url}", url);
 
-        var response = await _httpClient.PostAsync(url, content, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
+        var response = await _httpClient.PostAsync(url, content, cancellationToken); if (!response.IsSuccessStatusCode)
         {
             var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
             _logger.LogError("WIQL query failed. Status: {StatusCode}, Content: {Content}", response.StatusCode, errorContent);
-            throw new HttpRequestException($"WIQL query failed with status {response.StatusCode}: {errorContent}");
+
+            // Provide helpful error messages for common authentication issues
+            var errorMessage = response.StatusCode switch
+            {
+                HttpStatusCode.Unauthorized => CreateUnauthorizedErrorMessage(errorContent),
+                HttpStatusCode.Forbidden => "Access forbidden. Check if your Personal Access Token has the required permissions (Work Items: Read & Write).",
+                HttpStatusCode.NotFound => $"Resource not found. Please verify the organization '{_options.Organization}' and project '{_options.Project}' exist and are accessible.",
+                _ => $"WIQL query failed with status {response.StatusCode}: {errorContent}"
+            };
+
+            throw new HttpRequestException(errorMessage);
         }
 
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -644,6 +653,31 @@ public class AzureDevOpsService : IAzureDevOpsService
             }
         }
         return workItems;
+    }
+
+    /// <summary>
+    /// Creates a user-friendly error message for unauthorized access
+    /// </summary>
+    /// <param name="errorContent">The raw error content from the API response</param>
+    /// <returns>A helpful error message with instructions for the user</returns>
+    private static string CreateUnauthorizedErrorMessage(string errorContent)
+    {
+        // Check if the error content indicates an expired token
+        if (errorContent.Contains("expired", StringComparison.OrdinalIgnoreCase) ||
+            errorContent.Contains("Access Denied", StringComparison.OrdinalIgnoreCase))
+        {
+            return @"Authentication failed: Your Personal Access Token has expired or is invalid.
+
+To fix this issue:
+1. Go to https://dev.azure.com/{your-organization}/_usersSettings/tokens
+2. Create a new Personal Access Token with 'Work Items (Read & Write)' permissions
+3. Update the 'PersonalAccessToken' value in your appsettings.json file
+4. Make sure the token hasn't expired
+
+Current error: " + errorContent;
+        }
+
+        return $"Authentication failed: {errorContent}\n\nPlease check your Personal Access Token in appsettings.json and ensure it has the required permissions.";
     }
 
     #endregion
