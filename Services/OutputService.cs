@@ -98,6 +98,7 @@ public class OutputService
             var items = roadmapItems.ToList();
             _logger.LogInformation("Displaying {Count} roadmap items in console", items.Count);
 
+            // Keep all console output for roadmap display - this is user-facing output
             Console.WriteLine();
             Console.WriteLine("=== ROADMAP (Sorted by StackRank) ===");
             Console.WriteLine();

@@ -194,8 +194,11 @@ public class RoadmapService
          /// </summary>
     private async Task CreateItemFromPattern(List<int> children, string title, int? existingWorkItemId = null, int patternItemId = 0)
     {
-        // Create a divider for better console readability
-        Console.WriteLine(new string('=', 80)); if (existingWorkItemId.HasValue)
+        // Log the operation instead of console output for better maintainability
+        _logger.LogInformation("Creating/updating Release Train from pattern - Children: {ChildrenCount}, Title: '{Title}', ExistingId: {ExistingId}",
+            children.Count, title, existingWorkItemId);
+
+        if (existingWorkItemId.HasValue)
         {
             // Update existing release train by adding missing children
             await UpdateExistingWorkItemWithChildren(existingWorkItemId.Value, children, title, patternItemId);
@@ -214,7 +217,7 @@ public class RoadmapService
             }
         }
 
-        Console.WriteLine(new string('=', 80));
+        _logger.LogInformation("Completed Release Train pattern processing for: '{Title}'", title);
 
         // Short delay to ensure logs are readable and any API rate limits are respected
         await Task.Delay(100);
@@ -223,8 +226,8 @@ public class RoadmapService
          /// </summary>
     private async Task UpdateExistingWorkItemWithChildren(int existingWorkItemId, List<int> children, string title, int patternItemId = 0)
     {
-        Console.WriteLine($"UPDATING EXISTING RELEASE TRAIN: #{existingWorkItemId} - \"{title}\"");
-        Console.WriteLine($"WITH {children.Count} CHILDREN: {string.Join(", ", children)}");
+        _logger.LogInformation("Updating existing Release Train #{Id} - '{Title}' with {Count} children: [{Children}]",
+            existingWorkItemId, title, children.Count, string.Join(", ", children));
 
         _logger.LogInformation("Updating existing Release Train #{Id} with {Count} children from current pattern group", existingWorkItemId, children.Count);
 
@@ -232,7 +235,9 @@ public class RoadmapService
         _logger.LogInformation("Validating that Release Train #{Id} exists and is accessible", existingWorkItemId);
 
         // Get existing work item with relations to check what already exists
-        var existingWorkItem = await _azureDevOpsService.GetWorkItemWithRelationsAsync(existingWorkItemId); if (existingWorkItem == null)
+        var existingWorkItem = await _azureDevOpsService.GetWorkItemWithRelationsAsync(existingWorkItemId);
+
+        if (existingWorkItem == null)
         {
             _logger.LogError("CRITICAL ERROR: Release Train #{Id} does not exist or is not accessible. Cannot create relations to non-existent work item.", existingWorkItemId);
             _logger.LogError("This indicates a data integrity issue where the pattern references a work item ID that doesn't exist.");
@@ -245,20 +250,20 @@ public class RoadmapService
             // 2. Update the Feature title with the new Release Train ID
             // 3. Link all children to the new Release Train
             // This ensures data integrity and prevents broken references while maintaining workflow continuity
-            Console.WriteLine($"❌ ERROR: Release Train #{existingWorkItemId} does not exist");
-            Console.WriteLine($"🔄 RECOVERY: Creating new Release Train instead"); try
+            _logger.LogError("Release Train #{Id} does not exist", existingWorkItemId);
+            _logger.LogInformation("Creating new Release Train instead");
+
+            try
             {
                 int newWorkItemId = await CreateNewWorkItemFromPattern(children, title, 0);
                 if (newWorkItemId > 0)
                 {
                     _logger.LogInformation("✅ Successfully created new Release Train #{NewId} as replacement for non-existent #{OldId}", newWorkItemId, existingWorkItemId);
-                    Console.WriteLine($"✅ Created new Release Train #{newWorkItemId} instead of #{existingWorkItemId}");
 
                     // Update the Feature title with the new Release Train ID
                     if (patternItemId > 0)
                     {
                         _logger.LogInformation("🔄 Updating Feature #{PatternItemId} title to reference new Release Train #{NewId}", patternItemId, newWorkItemId);
-                        Console.WriteLine($"🔄 Updating Feature title to reference new Release Train #{newWorkItemId}");
                         await UpdatePatternItemWithId(patternItemId, title, newWorkItemId);
                     }
                 }
@@ -353,8 +358,8 @@ public class RoadmapService
      /// </summary>
     private async Task<int> CreateNewWorkItemFromPattern(List<int> children, string title, int patternItemId)
     {
-        Console.WriteLine($"CREATING NEW RELEASE TRAIN: \"{title}\"");
-        Console.WriteLine($"WITH {children.Count} CHILDREN: {string.Join(", ", children)}");
+        _logger.LogInformation("Creating new Release Train: '{Title}' with {Count} children: [{Children}]",
+            title, children.Count, string.Join(", ", children));
 
         _logger.LogInformation("Creating new Release Train: {Title} with {Count} children", title, children.Count);
 

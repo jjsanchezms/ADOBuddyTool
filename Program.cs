@@ -101,15 +101,17 @@ public class RoadmapApplication
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error running application");
+            // Keep console output for user-facing error messages
             Console.WriteLine($"Error: {ex.Message}");
             Environment.Exit(1);
         }
     }
-
     private bool ValidateOptions(CommandLineOptions options)
     {
         if (string.IsNullOrWhiteSpace(options.AreaPath))
         {
+            _logger.LogError("Area path is required");
+            // Keep console output for user-facing validation messages
             Console.WriteLine("Error: Area path is required.");
             Console.WriteLine();
             ShowHelp();
@@ -117,6 +119,8 @@ public class RoadmapApplication
         }
         if (!options.RunHygieneChecks && !options.CreateRoadmap && !options.SwagUpdates)
         {
+            _logger.LogError("At least one operation must be specified");
+            // Keep console output for user-facing validation messages
             Console.WriteLine("Error: At least one operation must be specified (--hygiene-checks, --create-roadmap, or --swag-updates).");
             Console.WriteLine();
             ShowHelp();
@@ -169,6 +173,8 @@ public class RoadmapApplication
         string workItemTypeDescription = options.RunHygieneChecks || options.SwagUpdates
             ? "Feature or Release Train work items"
             : "Feature work items";
+        _logger.LogWarning("No {WorkItemTypeDescription} found in area path '{AreaPath}'", workItemTypeDescription, options.AreaPath);
+        // Keep console output for user-facing information
         Console.WriteLine($"No {workItemTypeDescription} found in area path '{options.AreaPath}'.");
     }
     private async Task ProcessOperationsAsync(IEnumerable<WorkItem> workItems, CommandLineOptions options)
@@ -196,12 +202,13 @@ public class RoadmapApplication
             _logger.LogInformation("Application completed successfully");
         }
     }
-
     private async Task<IEnumerable<CreateRoadmapADO.Models.RoadmapItem>> ProcessRoadmapGenerationAsync(IEnumerable<WorkItem> workItems, CommandLineOptions options)
     {
         if (!options.Summary)
         {
             _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
+            _logger.LogInformation("Processing work items for special title patterns (Release Trains)");
+            // Keep console output for user-facing progress information
             Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
         }
 
@@ -209,35 +216,37 @@ public class RoadmapApplication
 
         if (!options.Summary)
         {
+            _logger.LogInformation("Finished processing special title patterns");
+            // Keep console output for user-facing progress information
             Console.WriteLine("\nFinished processing special title patterns\n");
         }
 
         DisplayReleaseTrainSummary(_services.Roadmap.OperationsSummary);
         return roadmapItems;
     }
-
     private async Task ProcessHygieneChecksAsync(IEnumerable<WorkItem> workItems, CommandLineOptions options)
     {
         if (!options.Summary)
         {
+            _logger.LogInformation("Starting ADO hygiene checks on {Count} work items", workItems.Count());
+            // Keep console output for user-facing section headers
             Console.WriteLine("\n" + "=".PadRight(ConsoleSeparatorWidth, '='));
             Console.WriteLine("RUNNING ADO HYGIENE CHECKS");
             Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
-            _logger.LogInformation("Starting ADO hygiene checks on {Count} work items", workItems.Count());
         }
 
         var hygieneResults = await _services.Hygiene.PerformHygieneChecksAsync(workItems);
         DisplayHygieneCheckResults(hygieneResults, options);
     }
-
     private async Task ProcessSwagUpdatesAsync(IEnumerable<WorkItem> workItems, CommandLineOptions options)
     {
         if (!options.Summary)
         {
+            _logger.LogInformation("Starting SWAG updates on Release Trains in area path: {AreaPath}", options.AreaPath);
+            // Keep console output for user-facing section headers
             Console.WriteLine("\n" + "=".PadRight(ConsoleSeparatorWidth, '='));
             Console.WriteLine("PROCESSING SWAG UPDATES");
             Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
-            _logger.LogInformation("Starting SWAG updates on Release Trains in area path: {AreaPath}", options.AreaPath);
         }
 
         var workItemsList = workItems.ToList();
@@ -254,6 +263,8 @@ public class RoadmapApplication
 
         if (!releaseTrains.Any())
         {
+            _logger.LogWarning("No Release Trains found in the specified area path");
+            // Keep console output for user-facing information
             Console.WriteLine("No Release Trains found in the specified area path.");
             return;
         }
@@ -269,10 +280,10 @@ public class RoadmapApplication
             try
             {
                 // Get the Release Train with its relations
-                var releaseTrainWithRelations = await _services.AzureDevOps.GetWorkItemWithRelationsAsync(releaseTrain.Id);
-
-                if (releaseTrainWithRelations?.Relations == null)
+                var releaseTrainWithRelations = await _services.AzureDevOps.GetWorkItemWithRelationsAsync(releaseTrain.Id); if (releaseTrainWithRelations?.Relations == null)
                 {
+                    _logger.LogWarning("Release Train #{Id} has no relations - skipping", releaseTrain.Id);
+                    // Keep console output for user-facing information
                     Console.WriteLine($"⚠️  Release Train #{releaseTrain.Id} has no relations - skipping");
                     continue;
                 }
@@ -284,10 +295,10 @@ public class RoadmapApplication
                                r.Rel == "System.LinkTypes.Hierarchy-Reverse")
                     .Select(r => r.GetRelatedWorkItemId())
                     .Where(id => id > 0)
-                    .ToList();
-
-                if (!relatedFeatureIds.Any())
+                    .ToList(); if (!relatedFeatureIds.Any())
                 {
+                    _logger.LogWarning("Release Train #{Id} '{Title}' has no related Features - skipping", releaseTrain.Id, releaseTrain.Title);
+                    // Keep console output for user-facing information
                     Console.WriteLine($"⚠️  Release Train #{releaseTrain.Id} '{releaseTrain.Title}' has no related Features - skipping");
                     continue;
                 }
@@ -302,21 +313,26 @@ public class RoadmapApplication
                         relatedFeatures.Add(feature);
                     }
                 }
-
                 if (!relatedFeatures.Any())
                 {
+                    _logger.LogWarning("Release Train #{Id} '{Title}' has no valid Feature relations - skipping", releaseTrain.Id, releaseTrain.Title);
+                    // Keep console output for user-facing information
                     Console.WriteLine($"⚠️  Release Train #{releaseTrain.Id} '{releaseTrain.Title}' has no valid Feature relations - skipping");
                     continue;
-                }                // Calculate total SWAG from related features
+                }// Calculate total SWAG from related features
                 var totalSwag = relatedFeatures
                     .Where(f => f.Swag.HasValue)
                     .Sum(f => f.Swag!.Value); var featuresWithSwag = relatedFeatures.Count(f => f.Swag.HasValue);
                 var featuresWithoutSwag = relatedFeatures.Count - featuresWithSwag;                // Check if Release Train has auto-generated tag
                 bool isAutoGenerated = !string.IsNullOrEmpty(releaseTrain.Tags) &&
                     releaseTrain.Tags.Split(';', StringSplitOptions.RemoveEmptyEntries)
-                        .Any(tag => tag.Trim().Equals("auto-generated", StringComparison.OrdinalIgnoreCase));// Extract current SWAG from status notes if present
+                        .Any(tag => tag.Trim().Equals("auto-generated", StringComparison.OrdinalIgnoreCase));                // Extract current SWAG from status notes if present
                 var currentSwagFromStatusNotes = CreateRoadmapADO.Services.AzureDevOpsService.ExtractSwagFromDescription(releaseTrain.StatusNotes);
 
+                _logger.LogInformation("Processing Release Train #{Id}: '{Title}' - Auto-generated: {IsAutoGenerated}, Related Features: {RelatedCount} ({FeaturesWithSwag} with SWAG), Current RT SWAG: {CurrentSwag}, Calculated SWAG: {CalculatedSwag}",
+                    releaseTrain.Id, releaseTrain.Title, isAutoGenerated, relatedFeatures.Count, featuresWithSwag, currentSwagFromStatusNotes?.ToString() ?? "Not set", totalSwag);
+
+                // Keep console output for user-facing detailed information
                 Console.WriteLine($"\n📊 Release Train #{releaseTrain.Id}: '{releaseTrain.Title}'");
                 Console.WriteLine($"   Auto-generated: {(isAutoGenerated ? "Yes" : "No")}");
                 Console.WriteLine($"   Related Features: {relatedFeatures.Count} ({featuresWithSwag} with SWAG, {featuresWithoutSwag} without)");
@@ -325,12 +341,17 @@ public class RoadmapApplication
 
                 if (featuresWithoutSwag > 0)
                 {
+                    _logger.LogWarning("Release Train #{Id} has {Count} Features with no SWAG value", releaseTrain.Id, featuresWithoutSwag);
+                    // Keep console output for user-facing warnings
                     Console.WriteLine($"   ⚠️  Warning: {featuresWithoutSwag} Features have no SWAG value");
                 }
                 if (isAutoGenerated || options.SwagUpdatesAll)
                 {
                     // For auto-generated Release Trains OR when in "all" mode: always update SWAG in status notes to match sum of features
                     var updateReason = options.SwagUpdatesAll ? "ALL mode" : "auto-generated";
+                    _logger.LogInformation("Updating Release Train #{Id} SWAG in status notes to {NewSwag} (was {OldSwag}) - {Reason}",
+                        releaseTrain.Id, totalSwag, currentSwagFromStatusNotes?.ToString() ?? "unset", updateReason);
+                    // Keep console output for user-facing update information
                     Console.WriteLine($"   🔄 Updating SWAG in status notes to {totalSwag} (was {currentSwagFromStatusNotes?.ToString() ?? "unset"}) - {updateReason}");
                     await _services.AzureDevOps.UpdateWorkItemStatusNotesWithSwagAsync(releaseTrain.Id, totalSwag, releaseTrain.StatusNotes);
                     updatedCount++;
@@ -340,11 +361,16 @@ public class RoadmapApplication
                     // For non-auto-generated Release Trains in normal mode: show warnings for mismatches
                     if (currentSwagFromStatusNotes != totalSwag)
                     {
+                        _logger.LogWarning("Release Train #{Id} SWAG mismatch: status notes ({CurrentSwag}) vs calculated ({CalculatedSwag})",
+                            releaseTrain.Id, currentSwagFromStatusNotes?.ToString() ?? "unset", totalSwag);
+                        // Keep console output for user-facing warnings
                         Console.WriteLine($"   ⚠️  WARNING: Release Train SWAG in status notes ({currentSwagFromStatusNotes?.ToString() ?? "unset"}) does not match sum of Features ({totalSwag})");
                         warningCount++;
                     }
                     else
                     {
+                        _logger.LogInformation("Release Train #{Id} SWAG matches calculated value: {Swag}", releaseTrain.Id, totalSwag);
+                        // Keep console output for user-facing confirmation
                         Console.WriteLine($"   ✅ SWAG matches calculated value");
                     }
                 }
@@ -352,9 +378,13 @@ public class RoadmapApplication
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing SWAG updates for Release Train {Id}", releaseTrain.Id);
+                // Keep console output for user-facing error information
                 Console.WriteLine($"❌ Error processing Release Train #{releaseTrain.Id}: {ex.Message}");
             }
         }        // Display summary
+        _logger.LogInformation("SWAG updates completed - Processed: {ProcessedCount}, Updated: {UpdatedCount}, Warnings: {WarningCount}",
+            releaseTrains.Count, updatedCount, warningCount);
+        // Keep console output for user-facing summary
         Console.WriteLine("\n" + "=".PadRight(ConsoleSeparatorWidth, '='));
         Console.WriteLine("SWAG UPDATES SUMMARY");
         Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
