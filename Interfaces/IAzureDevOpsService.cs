@@ -83,15 +83,19 @@ public interface IAzureDevOpsService : IDisposable
     /// </summary>    /// <param name="workItemId">ID of the work item to update</param>
     /// <param name="newTitle">The new title for the work item</param>
     /// <returns>Task representing the asynchronous operation</returns>
-    Task UpdateWorkItemTitleAsync(int workItemId, string newTitle);
-
-    /// <summary>
-    /// Updates a work item's SWAG (effort) value
-    /// </summary>
-    /// <param name="workItemId">ID of the work item to update</param>
-    /// <param name="swagValue">The new SWAG value</param>
-    /// <returns>Task representing the asynchronous operation</returns>
-    Task UpdateWorkItemSwagAsync(int workItemId, double swagValue);
+    Task UpdateWorkItemTitleAsync(int workItemId, string newTitle);    /// <summary>
+                                                                       /// Updates a work item's SWAG (effort) value
+                                                                       /// </summary>
+                                                                       /// <param name="workItemId">ID of the work item to update</param>
+                                                                       /// <param name="swagValue">The new SWAG value</param>
+                                                                       /// <returns>Task representing the asynchronous operation</returns>    Task UpdateWorkItemSwagAsync(int workItemId, double swagValue);    /// <summary>
+                                                                       /// Updates a work item's description with SWAG prefix
+                                                                       /// </summary>
+                                                                       /// <param name="workItemId">ID of the work item to update</param>
+                                                                       /// <param name="swagValue">The SWAG value to add as prefix</param>
+                                                                       /// <param name="originalStatusNotes">The original status notes</param>
+                                                                       /// <returns>Task representing the asynchronous operation</returns>
+    Task UpdateWorkItemStatusNotesWithSwagAsync(int workItemId, double swagValue, string originalStatusNotes);
 
     /// <summary>
     /// Creates a specific relation between two work items

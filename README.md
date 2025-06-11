@@ -115,14 +115,15 @@ CreateRoadmapADO --area-path "MyProject\\MyTeam" --swag-updates --limit 200
 
 ### SWAG Updates Operation
 
-The `--swag-updates` operation provides intelligent SWAG (effort estimation) management for Release Trains:
+The `--swag-updates` operation provides intelligent SWAG (effort estimation) management for Release Trains using the Acceptance Criteria field:
 
 #### For Auto-Generated Release Trains:
-- **Automatically updates** the Release Train's SWAG value to match the sum of all related Features
+- **Automatically updates** the Release Train's SWAG value in Acceptance Criteria to match the sum of all related Features
 - **Ensures consistency** between Release Train planning and actual Feature effort
+- **Uses `[SWAG: value]` prefix** in the Acceptance Criteria field to store SWAG information
 
 #### For Manual Release Trains:
-- **Validates** that the Release Train SWAG matches the sum of related Features
+- **Validates** that the Release Train SWAG in Acceptance Criteria matches the sum of related Features
 - **Shows warnings** when there are mismatches to help identify planning discrepancies
 - **Preserves manual values** while providing visibility into inconsistencies
 
@@ -131,16 +132,21 @@ The `--swag-updates` operation provides intelligent SWAG (effort estimation) man
 📊 Release Train #12345: 'Q1 2024 Platform Updates'
    Auto-generated: Yes
    Related Features: 5 (4 with SWAG, 1 without)
-   Current RT SWAG: 8
+   Current RT SWAG (from status notes): 8
    Calculated SWAG: 13
-   🔄 Updating SWAG from 8 to 13
+   🔄 Updating SWAG in status notes from 8 to 13
 
 📊 Release Train #12346: 'Manual Planning Release'
    Auto-generated: No
-   Related Features: 3 (3 with SWAG, 0 without)
-   Current RT SWAG: 15
+   Related Features: 3 (3 with SWAG, 0 without)   Current RT SWAG (from Acceptance Criteria): 15
    Calculated SWAG: 12
-   ⚠️  WARNING: Release Train SWAG (15) does not match sum of Features (12)
+   ⚠️  WARNING: Release Train SWAG in Acceptance Criteria (15) does not match sum of Features (12)
+```
+
+#### SWAG Storage Format:
+SWAG values are stored as a prefix in the Release Train's Acceptance Criteria field using the format:
+```
+[SWAG: 70]This is the original Acceptance Criteria content
 ```
 
 #### Benefits:
@@ -148,6 +154,7 @@ The `--swag-updates` operation provides intelligent SWAG (effort estimation) man
 - **Planning validation** for manual Release Trains
 - **Visibility** into Features missing SWAG estimates
 - **Data consistency** across Release Train hierarchies
+- **Non-intrusive storage** using status notes field with clear prefix format
 
 ### Options
 

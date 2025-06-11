@@ -22,6 +22,9 @@ public class WorkItem
     public string State { get; set; } = string.Empty; [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
 
+    [JsonPropertyName("statusNotes")]
+    public string StatusNotes { get; set; } = string.Empty;
+
     [JsonPropertyName("iterationPath")]
     public string? IterationPath { get; set; }
 

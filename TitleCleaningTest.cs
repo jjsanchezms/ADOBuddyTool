@@ -3,7 +3,7 @@ using System;
 // Test the title cleaning functionality
 public class TitleCleaningTest
 {
-    public static void Main()
+    public static void TestTitleCleaning()
     {
         Console.WriteLine("Testing Release Train Title Cleaning:");
         Console.WriteLine("=====================================");
