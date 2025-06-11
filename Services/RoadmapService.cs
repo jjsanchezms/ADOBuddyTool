@@ -70,24 +70,34 @@ public class RoadmapService
         int currentPatternItemId = 0;
         bool isCollectingItems = false;
 
-        _logger.LogInformation("Scanning for special title patterns in work items");
-
-        foreach (var workItem in workItemsList)
-        {
-            // Check for special title patterns
+        _logger.LogInformation("Scanning for special title patterns in work items");        foreach (var workItem in workItemsList)
+        {            // Check for special title patterns
             // Match titles like "----- TITLE -----rt" with optional IDs like ":1234"
             // Only look for "rt" patterns (release trains)
             var patternStart = new Regex(@"^-+\s*(.*?)\s*-+rt(?::(\d+))?$");
             var match = patternStart.Match(workItem.Title);
-            
-            if (match.Success)
+              // Check if this is a section separator (like "CY25H1 Features Begin")
+            var isSectionSeparator = workItem.Title.StartsWith("---") && workItem.Title.EndsWith("---") && 
+                !workItem.Title.Contains("-----rt") && 
+                (workItem.Title.Contains("Begin") || workItem.Title.Contains("End") || workItem.Title.Contains("Feature") || workItem.Title.Contains("CY25"));
+                
+            _logger.LogDebug("Processing work item {Id}: '{Title}' - IsReleaseTrain: {IsReleaseTrain}, IsSectionSeparator: {IsSectionSeparator}, IsCollecting: {IsCollecting}", 
+                workItem.Id, workItem.Title, match.Success, isSectionSeparator, isCollectingItems);            if (match.Success)
             {
                 // If we were already collecting items, create the previous release train
                 if (isCollectingItems && currentTitle != null && currentChildren.Any())
                 {
-                    _logger.LogInformation("Creating previous group before starting new one");
+                    _logger.LogInformation("PATTERN DETECTED: Creating previous group '{CurrentTitle}' with {Count} children before starting new group '{NewTitle}'", 
+                        currentTitle, currentChildren.Count, match.Groups[1].Value.Trim());
+                    
+                    // Log all children being added to the previous group
+                    _logger.LogInformation("Children for '{CurrentTitle}': [{Children}]", 
+                        currentTitle, string.Join(", ", currentChildren));
+                    
                     await CreateItemFromPattern(currentChildren, currentTitle, currentExistingId, currentPatternItemId);
                     currentChildren.Clear();
+                    
+                    _logger.LogInformation("COMPLETED: Previous group '{PreviousTitle}' created. Children list cleared.", currentTitle);
                 }
 
                 // Extract new title from between the markers
@@ -95,21 +105,44 @@ public class RoadmapService
                 
                 // Store the pattern item ID for later renaming
                 currentPatternItemId = workItem.Id;
-                
-                // Extract existing work item ID if present
+                  // Extract existing work item ID if present
                 currentExistingId = null;
                 if (match.Groups.Count > 2 && !string.IsNullOrEmpty(match.Groups[2].Value))
                 {
                     if (int.TryParse(match.Groups[2].Value, out int parsedId))
                     {
                         currentExistingId = parsedId;
+                        _logger.LogInformation("Pattern references existing Release Train ID: {ExistingId}", parsedId);
                     }
+                    else
+                    {
+                        _logger.LogWarning("Pattern contains invalid ID format: '{InvalidId}' - will create new Release Train instead", match.Groups[2].Value);
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("Pattern does not reference existing Release Train ID - will create new one");
                 }
                 
                 isCollectingItems = true;
 
-                _logger.LogInformation("Found Release Train pattern: \"{Title}\"{IdInfo}", 
+                _logger.LogInformation("STARTED: Now collecting for Release Train pattern: \"{Title}\"{IdInfo}", 
                     currentTitle, currentExistingId.HasValue ? $" (ID: {currentExistingId})" : "");
+            }
+            // Check if this is a section separator - these should end the current group
+            else if (isSectionSeparator)
+            {
+                _logger.LogInformation("Found section separator: {Title}", workItem.Title);
+                
+                // If we were collecting items, create the release train
+                if (isCollectingItems && currentTitle != null && currentChildren.Any())
+                {
+                    _logger.LogInformation("Ending group due to section separator: \"{Title}\" with {Count} children", 
+                        currentTitle, currentChildren.Count);
+                    await CreateItemFromPattern(currentChildren, currentTitle, currentExistingId, currentPatternItemId);
+                    currentChildren.Clear();
+                    isCollectingItems = false;
+                }
             }
             // If we're collecting items and this isn't a special title, add it to current children
             else if (isCollectingItems)
@@ -117,7 +150,7 @@ public class RoadmapService
                 // Check if this is an end marker without a new group (just dashes)
                 // Match patterns that start and end with at least 3 dashes and don't contain "rt"
                 var isEndMarker = workItem.Title.StartsWith("---") && workItem.Title.EndsWith("---") && 
-                    !workItem.Title.EndsWith("rt");
+                    !workItem.Title.Contains("-----rt");
                 
                 if (isEndMarker)
                 {
@@ -126,24 +159,27 @@ public class RoadmapService
                     // End current group
                     if (currentTitle != null && currentChildren.Any())
                     {
+                        _logger.LogInformation("Ending group due to end marker: \"{Title}\" with {Count} children", 
+                            currentTitle, currentChildren.Count);
                         await CreateItemFromPattern(currentChildren, currentTitle, currentExistingId, currentPatternItemId);
                         currentChildren.Clear();
                         isCollectingItems = false;
                     }
-                }
-                else
+                }                else
                 {
                     // Add to current children
                     currentChildren.Add(workItem.Id);
-                    _logger.LogDebug("Added child work item: {Id} - {Title}", workItem.Id, workItem.Title);
+                    _logger.LogInformation("CHILD ADDED: Added work item {Id} to '{CurrentTitle}': '{Title}' (Total children: {Count})", 
+                        workItem.Id, currentTitle ?? "UNKNOWN", workItem.Title, currentChildren.Count);
                 }
             }
-        }
-
-        // Don't forget to create the last release train if we were collecting items
+        }        // Don't forget to create the last release train if we were collecting items
         if (isCollectingItems && currentTitle != null && currentChildren.Any())
         {
-            _logger.LogInformation("Creating final group at end of processing");
+            _logger.LogInformation("FINAL GROUP: Creating final group '{Title}' at end of processing with {Count} children", 
+                currentTitle, currentChildren.Count);
+            _logger.LogInformation("Final children for '{CurrentTitle}': [{Children}]", 
+                currentTitle, string.Join(", ", currentChildren));
             await CreateItemFromPattern(currentChildren, currentTitle, currentExistingId, currentPatternItemId);
         }
     }    /// <summary>
@@ -183,12 +219,47 @@ public class RoadmapService
         Console.WriteLine($"UPDATING EXISTING RELEASE TRAIN: #{existingWorkItemId} - \"{title}\"");
         Console.WriteLine($"WITH {children.Count} CHILDREN: {string.Join(", ", children)}");
         
-        _logger.LogInformation("Updating existing Release Train #{Id} with {Count} children", existingWorkItemId, children.Count);
+        _logger.LogInformation("Updating existing Release Train #{Id} with {Count} children from current pattern group", existingWorkItemId, children.Count);
+        
+        // First, validate that the release train actually exists
+        _logger.LogInformation("Validating that Release Train #{Id} exists and is accessible", existingWorkItemId);
         
         // Get existing work item with relations to check what already exists
         var existingWorkItem = await _azureDevOpsService.GetWorkItemWithRelationsAsync(existingWorkItemId);
-        var existingRelatedIds = new HashSet<int>();
+          if (existingWorkItem == null)
+        {
+            _logger.LogError("CRITICAL ERROR: Release Train #{Id} does not exist or is not accessible. Cannot create relations to non-existent work item.", existingWorkItemId);
+            _logger.LogError("This indicates a data integrity issue where the pattern references a work item ID that doesn't exist.");
+            _logger.LogWarning("AUTOMATIC RECOVERY: Creating a new Release Train instead of updating the non-existent one.");
+            
+            // Instead of failing, create a new release train
+            Console.WriteLine($"❌ ERROR: Release Train #{existingWorkItemId} does not exist");
+            Console.WriteLine($"🔄 RECOVERY: Creating new Release Train instead");
+            
+            try
+            {
+                int newWorkItemId = await CreateNewWorkItemFromPattern(children, title, 0);
+                if (newWorkItemId > 0)
+                {
+                    _logger.LogInformation("✅ Successfully created new Release Train #{NewId} as replacement for non-existent #{OldId}", newWorkItemId, existingWorkItemId);
+                    Console.WriteLine($"✅ Created new Release Train #{newWorkItemId} instead of #{existingWorkItemId}");
+                }
+                else
+                {
+                    _logger.LogError("❌ Failed to create replacement Release Train");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Failed to create replacement Release Train for non-existent #{Id}", existingWorkItemId);
+            }
+            
+            return;
+        }
         
+        _logger.LogInformation("✅ Release Train #{Id} exists and is accessible. Proceeding with relation updates.", existingWorkItemId);
+        
+        var existingRelatedIds = new HashSet<int>();        
         if (existingWorkItem?.Relations != null)
         {
             foreach (var relation in existingWorkItem.Relations)
@@ -204,8 +275,27 @@ public class RoadmapService
             }
         }
         
+        _logger.LogInformation("Existing Release Train #{Id} already has {ExistingCount} related items: [{ExistingItems}]", 
+            existingWorkItemId, existingRelatedIds.Count, string.Join(", ", existingRelatedIds));
+        
+        // Check if we should replace existing relations instead of adding to them
+        // If the current pattern only has a few specific children, it might be a targeted update
+        var shouldReplaceRelations = children.Count <= 10; // Heuristic: small groups are usually targeted updates
+        
+        if (shouldReplaceRelations && existingRelatedIds.Any())
+        {
+            _logger.LogWarning("NOTICE: Existing Release Train #{Id} has {ExistingCount} relations, but current pattern only specifies {NewCount} children. Consider if this is intentional.", 
+                existingWorkItemId, existingRelatedIds.Count, children.Count);
+            
+            // For now, we'll still just add new relations, but log the discrepancy
+            // In the future, you might want to add logic to remove old relations that aren't in the current pattern
+        }
+        
         // Find children that don't already have relations
         var newChildren = children.Where(childId => !existingRelatedIds.Contains(childId)).ToList();
+        
+        _logger.LogInformation("From current pattern group, {NewCount} items are new: [{NewItems}]", 
+            newChildren.Count, string.Join(", ", newChildren));
         
         // Track the update operation with accurate counts
         OperationsSummary.Operations.Add(new ReleaseTrainOperation
@@ -221,12 +311,13 @@ public class RoadmapService
         // Only create relations for children that don't already have them
         if (newChildren.Any())
         {
-            _logger.LogInformation("Adding {NewCount} new relations out of {TotalCount} children", newChildren.Count, children.Count);
+            _logger.LogInformation("Adding {NewCount} new relations out of {TotalCount} children from current pattern", newChildren.Count, children.Count);
             
             foreach (var childId in newChildren)
             {
                 try
                 {
+                    _logger.LogInformation("Creating relation from Release Train #{ParentId} to child #{ChildId}", existingWorkItemId, childId);
                     await _azureDevOpsService.CreateRelationAsync(existingWorkItemId, childId, "Child relation from pattern processing");
                 }
                 catch (Exception ex)
@@ -237,7 +328,7 @@ public class RoadmapService
         }
         else
         {
-            _logger.LogInformation("All child relations already exist for Release Train #{Id}", existingWorkItemId);
+            _logger.LogInformation("All child relations from current pattern already exist for Release Train #{Id}", existingWorkItemId);
         }
     }/// <summary>
     /// Creates a new release train from the pattern
@@ -363,5 +454,4 @@ public class RoadmapService
         };
 
         return startDate.AddDays(estimatedDays);
-    }
-}
+    }}
