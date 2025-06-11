@@ -278,19 +278,14 @@ public class AzureDevOpsService : IAzureDevOpsService
         Console.WriteLine($"With {children.Count} children: {string.Join(", ", children)}");
 
         try
-        {            // Create the Release Train work item type
+        {
+            // Create the Release Train work item type
             var releaseTrainId = await CreateWorkItemAsync("Release Train", title);
 
             if (releaseTrainId > 0)
             {
                 // Create relations to child work items
                 await CreateRelationsAsync(releaseTrainId, children);
-
-                // If we have a pattern item ID, also create a specific relation to that item
-                if (patternItemId > 0 && !children.Contains(patternItemId))
-                {
-                    await CreateRelationAsync(releaseTrainId, patternItemId, "Auto-generated from pattern item");
-                }
 
                 _logger.LogInformation("Successfully created Release Train #{ReleaseTrainId}: {Title}", releaseTrainId, title);
                 Console.WriteLine($"Successfully created Release Train #{releaseTrainId}: {title}");
