@@ -84,7 +84,7 @@ public class RoadmapService
             // Match titles like "----- TITLE -----rt" or "----------- TITLE ----------rt:1234"
             // Only look for "rt" patterns (release trains)
             // Updated regex to handle various dash patterns and spacing
-            var patternStart = new Regex(@"^---\s*(.*?)\s*---rt(?::(\d+))?$", RegexOptions.IgnoreCase);
+            var patternStart = new Regex(@"^---+\s*(.*?)\s*---+rt(?::(\d+))?$", RegexOptions.IgnoreCase);
             var match = patternStart.Match(workItem.Title);
             // Check if this is a section separator (like "CY25H1 Features Begin")
             var isSectionSeparator = workItem.Title.StartsWith("---");
@@ -196,12 +196,12 @@ public class RoadmapService
     private async Task CreateItemFromPattern(List<int> children, string title, int? existingWorkItemId = null, int patternItemId = 0)
     {
         // Create a divider for better console readability
-        Console.WriteLine(new string('=', 80));
-
-        if (existingWorkItemId.HasValue)
+        Console.WriteLine(new string('=', 80)); if (existingWorkItemId.HasValue)
         {
             // Update existing release train by adding missing children
             await UpdateExistingWorkItemWithChildren(existingWorkItemId.Value, children, title);
+            // Note: Don't update pattern item title when updating existing Release Train,
+            // as it already contains the correct ID
         }
         else
         {
