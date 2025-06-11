@@ -232,14 +232,19 @@ public class RoadmapService
         _logger.LogInformation("Validating that Release Train #{Id} exists and is accessible", existingWorkItemId);
 
         // Get existing work item with relations to check what already exists
-        var existingWorkItem = await _azureDevOpsService.GetWorkItemWithRelationsAsync(existingWorkItemId);
-        if (existingWorkItem == null)
+        var existingWorkItem = await _azureDevOpsService.GetWorkItemWithRelationsAsync(existingWorkItemId); if (existingWorkItem == null)
         {
             _logger.LogError("CRITICAL ERROR: Release Train #{Id} does not exist or is not accessible. Cannot create relations to non-existent work item.", existingWorkItemId);
             _logger.LogError("This indicates a data integrity issue where the pattern references a work item ID that doesn't exist.");
             _logger.LogWarning("AUTOMATIC RECOVERY: Creating a new Release Train instead of updating the non-existent one.");
 
-            // Instead of failing, create a new release train
+            // FEATURE: Automatic Error Recovery for Non-Existent Release Train References
+            // When a Feature references a Release Train ID that doesn't exist (e.g., "----- GCCH -----rt:4160082"),
+            // instead of failing, we:
+            // 1. Create a new Release Train with the same title
+            // 2. Update the Feature title with the new Release Train ID
+            // 3. Link all children to the new Release Train
+            // This ensures data integrity and prevents broken references while maintaining workflow continuity
             Console.WriteLine($"❌ ERROR: Release Train #{existingWorkItemId} does not exist");
             Console.WriteLine($"🔄 RECOVERY: Creating new Release Train instead"); try
             {
@@ -391,12 +396,8 @@ public class RoadmapService
                 patternItemId, newWorkItemId);
         }
     }
-
     public RoadmapItem ConvertToRoadmapItem(WorkItem workItem)
     {
-        // Set start date to current date for estimation purposes
-        var startDate = DateTime.Today;
-
         return new RoadmapItem
         {
             Id = workItem.Id,
@@ -407,22 +408,16 @@ public class RoadmapService
                 RoadmapItemStatus.NotStarted :
                 MapWorkItemStateToRoadmapStatus(workItem.State),
             StackRank = workItem.StackRank,
-            // Assign priority based on StackRank if available
-            Priority = workItem.StackRank.HasValue ?
-                (int)Math.Ceiling(100 - (workItem.StackRank.Value % 100)) :
-                null,
-            // Assign start and end dates for timeline visualization
-            StartDate = startDate,
-            EndDate = EstimateEndDate(startDate, workItem.WorkItemType)
+            Priority = null,
+            StartDate = null,
+            EndDate = null
         };
     }
-
     public IEnumerable<RoadmapItem> SortRoadmapItems(IEnumerable<RoadmapItem> roadmapItems)
     {
         return roadmapItems
-            .OrderBy(item => item.StackRank ?? double.MaxValue) // Sort by StackRank (ASC) first            .ThenByDescending(item => item.Priority ?? 0) // Then by priority (DESC)
-            .ThenBy(item => item.StartDate ?? DateTime.MaxValue) // Then by start date (ASC)
-            .ThenBy(item => item.Title); // Finally alphabetical
+            .OrderBy(item => item.StackRank ?? double.MaxValue) // Sort by StackRank (ASC) first
+            .ThenBy(item => item.Title); // Then alphabetical
     }
 
     private static RoadmapItemType MapWorkItemTypeToRoadmapType(string workItemType)
@@ -446,24 +441,11 @@ public class RoadmapService
             "removed" or "cut" => RoadmapItemStatus.Cancelled,
             _ => RoadmapItemStatus.NotStarted
         };
-    }
-
-    private static DateTime EstimateEndDate(DateTime startDate, string workItemType)
-    {        // Simple estimation logic - could be enhanced with actual data
-        var estimatedDays = workItemType.ToLowerInvariant() switch
-        {
-            "release train" => 90, // 3 months
-            "feature" => 30, // 1 month
-            "initiative" => 180, // 6 months
-            _ => 14 // 2 weeks
-        }; return startDate.AddDays(estimatedDays);
-    }
-
-    /// <summary>
-    /// Cleans a release train title by removing excess dashes and whitespace
-    /// </summary>
-    /// <param name="rawTitle">The raw title extracted from the pattern</param>
-    /// <returns>Clean title with just the core text</returns>
+    }    /// <summary>
+         /// Cleans a release train title by removing excess dashes and whitespace
+         /// </summary>
+         /// <param name="rawTitle">The raw title extracted from the pattern</param>
+         /// <returns>Clean title with just the core text</returns>
     private static string CleanReleaseTrainTitle(string rawTitle)
     {
         if (string.IsNullOrWhiteSpace(rawTitle))

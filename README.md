@@ -269,12 +269,14 @@ Cancelled: 2
 
 The application includes comprehensive error handling:
 - **Required Parameter Validation**: Ensures area path is provided before execution
+- **Automatic Release Train Recovery**: When Features reference non-existent Release Train IDs, automatically creates new Release Trains and updates Feature titles
+- **Data Integrity Protection**: Prevents broken references while maintaining workflow continuity
 - Configuration validation
 - HTTP request timeouts
 - API error responses for both reading and creating work items
 - Release Train creation failures with rollback support
 - File I/O errors
-- Logging of all errors and warnings
+- Logging of all errors, warnings, and recovery operations
 
 ## Dependencies
 
