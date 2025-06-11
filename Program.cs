@@ -20,38 +20,15 @@ using var loggerFactory = LoggerFactory.Create(builder =>
 try
 {
     // Create logger for the application
-    var logger = loggerFactory.CreateLogger<RoadmapApplication>();    // Create services with simple constructor injection
-    var azureDevOpsLogger = loggerFactory.CreateLogger<AzureDevOpsService>();
-    var azureDevOpsService = new AzureDevOpsService(azureDevOpsLogger);
+    var logger = loggerFactory.CreateLogger<RoadmapApplication>();
 
-    var roadmapLogger = loggerFactory.CreateLogger<RoadmapService>();
-    var roadmapService = new RoadmapService(roadmapLogger, azureDevOpsService);
-
-    var outputLogger = loggerFactory.CreateLogger<OutputService>();
-    var outputService = new OutputService(outputLogger);
-    // Create individual hygiene check instances with their loggers
-    var iterationPathAlignmentCheck = new IterationPathAlignmentCheck(
-        loggerFactory.CreateLogger<IterationPathAlignmentCheck>());
-    var releaseTrainCompletenessCheck = new ReleaseTrainCompletenessCheck(
-        iterationPathAlignmentCheck,
-        loggerFactory.CreateLogger<ReleaseTrainCompletenessCheck>()); var statusNotesDocumentationCheck = new StatusNotesDocumentationCheck(
-        loggerFactory.CreateLogger<StatusNotesDocumentationCheck>());
-    var featureStateConsistencyCheck = new FeatureStateConsistencyCheck(
-        loggerFactory.CreateLogger<FeatureStateConsistencyCheck>());
-
-    var hygieneLogger = loggerFactory.CreateLogger<HygieneCheckService>();
-    var hygieneService = new HygieneCheckService(
-        azureDevOpsService,
-        hygieneLogger,
-        releaseTrainCompletenessCheck,
-        statusNotesDocumentationCheck,
-        featureStateConsistencyCheck);
-    // Create and run the application
-    var app = new RoadmapApplication(azureDevOpsService, roadmapService, outputService, hygieneService, logger);
+    // Create services using simplified container
+    var services = new ServiceContainer(loggerFactory);
+    var app = new RoadmapApplication(services, logger);
     await app.RunAsync(args);
 
     // Cleanup
-    azureDevOpsService.Dispose();
+    services.AzureDevOps.Dispose();
 }
 catch (Exception ex)
 {
@@ -87,126 +64,39 @@ static CommandLineOptions ParseEarlyArguments(string[] args)
 /// </summary>
 public class RoadmapApplication
 {
-    private readonly IAzureDevOpsService _azureDevOpsService;
-    private readonly RoadmapService _roadmapService;
-    private readonly OutputService _outputService;
-    private readonly HygieneCheckService _hygieneService;
+    // Constants for better readability - replace magic numbers with meaningful names
+    private const int ConsoleSeparatorWidth = 60;  // Width for console formatting separators
+
+    private readonly ServiceContainer _services;
     private readonly ILogger<RoadmapApplication> _logger;
 
-    public RoadmapApplication(
-        IAzureDevOpsService azureDevOpsService,
-        RoadmapService roadmapService,
-        OutputService outputService,
-        HygieneCheckService hygieneService,
-        ILogger<RoadmapApplication> logger)
+    public RoadmapApplication(ServiceContainer services, ILogger<RoadmapApplication> logger)
     {
-        _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
-        _roadmapService = roadmapService ?? throw new ArgumentNullException(nameof(roadmapService));
-        _outputService = outputService ?? throw new ArgumentNullException(nameof(outputService));
-        _hygieneService = hygieneService ?? throw new ArgumentNullException(nameof(hygieneService));
+        _services = services ?? throw new ArgumentNullException(nameof(services));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
+
     public async Task RunAsync(string[] args)
     {
         try
         {
-            // Parse command line arguments
-            var options = ParseArguments(args);            // Validate required parameters
-            if (string.IsNullOrWhiteSpace(options.AreaPath))
-            {
-                Console.WriteLine("Error: Area path is required.");
-                Console.WriteLine();
-                ShowHelp();
-                return;
-            }
+            var options = ParseArguments(args);
 
-            // Validate that at least one operation is requested
-            if (!options.RunHygieneChecks && !options.CreateRoadmap)
-            {
-                Console.WriteLine("Error: At least one operation must be specified (--hygiene-checks or --create-roadmap).");
-                Console.WriteLine();
-                ShowHelp();
-                return;
-            }            // Only show startup message if not in summary mode
+            if (!ValidateOptions(options)) return;
+
             if (!options.Summary)
             {
                 _logger.LogInformation("Starting CreateRoadmapADO application");
-            }// Retrieve work items from Azure DevOps
-            IEnumerable<WorkItem> workItems; if (!options.Summary)
-            {
-                if (options.RunHygieneChecks)
-                {
-                    _logger.LogInformation("Retrieving Feature and Release Train work items for hygiene checks (limit: {Limit}, area path: {AreaPath})",
-                        options.Limit, options.AreaPath);
-                }
-                else if (options.CreateRoadmap)
-                {
-                    _logger.LogInformation("Retrieving Feature work items for roadmap generation (limit: {Limit}, area path: {AreaPath})",
-                        options.Limit, options.AreaPath);
-                }
             }
 
-            if (options.RunHygieneChecks)
-            {
-                // For hygiene checks, get both Feature and Release Train work items
-                workItems = await _azureDevOpsService.GetWorkItemsForHygieneChecksAsync(options.Limit, options.AreaPath!);
-            }
-            else
-            {
-                // For roadmap generation, get only Feature work items
-                workItems = await _azureDevOpsService.GetWorkItemsAsync(options.Limit, options.AreaPath!);
-            }
+            var workItems = await GetWorkItemsAsync(options);
             if (!workItems.Any())
             {
-                if (!options.Summary)
-                {
-                    _logger.LogInformation("No work items found in area path '{AreaPath}'.", options.AreaPath);
-                }
-                string workItemTypeDescription = options.RunHygieneChecks
-                  ? "Feature or Release Train work items"
-                  : "Feature work items";
-                Console.WriteLine($"No {workItemTypeDescription} found in area path '{options.AreaPath}'.");
+                HandleNoWorkItemsFound(options);
                 return;
             }
 
-            // Only show processing messages if not in summary mode and roadmap is requested
-            if (!options.Summary && options.CreateRoadmap)
-            {
-                _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
-                Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
-            }
-
-            // Run roadmap generation if requested
-            IEnumerable<CreateRoadmapADO.Models.RoadmapItem> roadmapItems = Enumerable.Empty<CreateRoadmapADO.Models.RoadmapItem>();
-            if (options.CreateRoadmap)
-            {
-                roadmapItems = await _roadmapService.GenerateRoadmapAsync(workItems);
-
-                if (!options.Summary)
-                {
-                    Console.WriteLine("\nFinished processing special title patterns\n");
-                }
-
-                // Always display Release Train Summary (this is the main output for summary mode)
-                DisplayReleaseTrainSummary(_roadmapService.OperationsSummary);
-            }            // Run hygiene checks if requested
-            if (options.RunHygieneChecks)
-            {
-                if (!options.Summary)
-                {
-                    Console.WriteLine("\n" + "=".PadRight(60, '='));
-                    Console.WriteLine("RUNNING ADO HYGIENE CHECKS");
-                    Console.WriteLine("=".PadRight(60, '='));
-                    _logger.LogInformation("Starting ADO hygiene checks on {Count} work items", workItems.Count());
-                }
-                var hygieneResults = await _hygieneService.PerformHygieneChecksAsync(workItems);
-                DisplayHygieneCheckResults(hygieneResults, options);
-            }            // Output roadmap if requested and not in summary mode
-            if (!options.Summary && options.CreateRoadmap)
-            {
-                _outputService.DisplayInConsole(roadmapItems);
-                _logger.LogInformation("Application completed successfully");
-            }
+            await ProcessOperationsAsync(workItems, options);
         }
         catch (Exception ex)
         {
@@ -215,6 +105,116 @@ public class RoadmapApplication
             Environment.Exit(1);
         }
     }
+
+    private bool ValidateOptions(CommandLineOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.AreaPath))
+        {
+            Console.WriteLine("Error: Area path is required.");
+            Console.WriteLine();
+            ShowHelp();
+            return false;
+        }
+
+        if (!options.RunHygieneChecks && !options.CreateRoadmap)
+        {
+            Console.WriteLine("Error: At least one operation must be specified (--hygiene-checks or --create-roadmap).");
+            Console.WriteLine();
+            ShowHelp();
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task<IEnumerable<WorkItem>> GetWorkItemsAsync(CommandLineOptions options)
+    {
+        if (!options.Summary)
+        {
+            if (options.RunHygieneChecks)
+            {
+                _logger.LogInformation("Retrieving Feature and Release Train work items for hygiene checks (limit: {Limit}, area path: {AreaPath})",
+                    options.Limit, options.AreaPath);
+            }
+            else if (options.CreateRoadmap)
+            {
+                _logger.LogInformation("Retrieving Feature work items for roadmap generation (limit: {Limit}, area path: {AreaPath})",
+                    options.Limit, options.AreaPath);
+            }
+        }
+
+        return options.RunHygieneChecks
+            ? await _services.AzureDevOps.GetWorkItemsForHygieneChecksAsync(options.Limit, options.AreaPath!)
+            : await _services.AzureDevOps.GetWorkItemsAsync(options.Limit, options.AreaPath!);
+    }
+
+    private void HandleNoWorkItemsFound(CommandLineOptions options)
+    {
+        if (!options.Summary)
+        {
+            _logger.LogInformation("No work items found in area path '{AreaPath}'.", options.AreaPath);
+        }
+
+        string workItemTypeDescription = options.RunHygieneChecks
+            ? "Feature or Release Train work items"
+            : "Feature work items";
+        Console.WriteLine($"No {workItemTypeDescription} found in area path '{options.AreaPath}'.");
+    }
+
+    private async Task ProcessOperationsAsync(IEnumerable<WorkItem> workItems, CommandLineOptions options)
+    {
+        IEnumerable<CreateRoadmapADO.Models.RoadmapItem> roadmapItems = Enumerable.Empty<CreateRoadmapADO.Models.RoadmapItem>();
+
+        if (options.CreateRoadmap)
+        {
+            roadmapItems = await ProcessRoadmapGenerationAsync(workItems, options);
+        }
+
+        if (options.RunHygieneChecks)
+        {
+            await ProcessHygieneChecksAsync(workItems, options);
+        }
+
+        if (!options.Summary && options.CreateRoadmap)
+        {
+            _services.Output.DisplayInConsole(roadmapItems);
+            _logger.LogInformation("Application completed successfully");
+        }
+    }
+
+    private async Task<IEnumerable<CreateRoadmapADO.Models.RoadmapItem>> ProcessRoadmapGenerationAsync(IEnumerable<WorkItem> workItems, CommandLineOptions options)
+    {
+        if (!options.Summary)
+        {
+            _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
+            Console.WriteLine("\nProcessing work items for special title patterns (Release Trains)...\n");
+        }
+
+        var roadmapItems = await _services.Roadmap.GenerateRoadmapAsync(workItems);
+
+        if (!options.Summary)
+        {
+            Console.WriteLine("\nFinished processing special title patterns\n");
+        }
+
+        DisplayReleaseTrainSummary(_services.Roadmap.OperationsSummary);
+        return roadmapItems;
+    }
+
+    private async Task ProcessHygieneChecksAsync(IEnumerable<WorkItem> workItems, CommandLineOptions options)
+    {
+        if (!options.Summary)
+        {
+            Console.WriteLine("\n" + "=".PadRight(ConsoleSeparatorWidth, '='));
+            Console.WriteLine("RUNNING ADO HYGIENE CHECKS");
+            Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
+            _logger.LogInformation("Starting ADO hygiene checks on {Count} work items", workItems.Count());
+        }
+
+        var hygieneResults = await _services.Hygiene.PerformHygieneChecksAsync(workItems);
+        DisplayHygieneCheckResults(hygieneResults, options);
+    }
+
     private static CommandLineOptions ParseArguments(string[] args)
     {
         var options = new CommandLineOptions();
@@ -249,6 +249,7 @@ public class RoadmapApplication
 
         return options;
     }
+
     private static void ShowHelp()
     {
         Console.WriteLine("CreateRoadmapADO - Generate roadmaps from Azure DevOps Feature work items");
@@ -287,9 +288,9 @@ public class RoadmapApplication
     /// <param name="summary">The operations summary to display</param>
     private static void DisplayReleaseTrainSummary(ReleaseTrainSummary summary)
     {
-        Console.WriteLine("=".PadRight(60, '='));
+        Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
         Console.WriteLine("RELEASE TRAIN SUMMARY");
-        Console.WriteLine("=".PadRight(60, '='));
+        Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
 
         if (!summary.BacklogReadSuccessfully)
         {
@@ -334,18 +335,21 @@ public class RoadmapApplication
             Console.WriteLine();
         }
 
-        Console.WriteLine("=".PadRight(60, '='));
+        Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
         Console.WriteLine();
-    }    /// <summary>
-         /// Displays hygiene check results in a formatted manner
-         /// </summary>
-         /// <param name="hygieneResults">The hygiene check results to display</param>
-         /// <param name="options">Command line options for output formatting</param>
+    }
+
+    /// <summary>
+    /// Displays hygiene check results in a formatted manner
+    /// </summary>
+    /// <param name="hygieneResults">The hygiene check results to display</param>
+    /// <param name="options">Command line options for output formatting</param>
     private void DisplayHygieneCheckResults(HygieneCheckSummary hygieneResults, CommandLineOptions options)
-    {        // Display summary
+    {
+        // Display summary
         Console.WriteLine();
         Console.WriteLine("HYGIENE CHECK SUMMARY");
-        Console.WriteLine("=".PadRight(60, '='));
+        Console.WriteLine("=".PadRight(ConsoleSeparatorWidth, '='));
         Console.WriteLine($"Total Checks: {hygieneResults.TotalChecks}");
         Console.WriteLine($"Passed: {hygieneResults.PassedChecks} ✅");
         Console.WriteLine($"Failed: {hygieneResults.FailedChecks} ❌");
@@ -369,7 +373,7 @@ public class RoadmapApplication
         {
             Console.WriteLine();
             Console.WriteLine("ISSUES BY CHECK TYPE");
-            Console.WriteLine("-".PadRight(60, '-'));
+            Console.WriteLine("-".PadRight(ConsoleSeparatorWidth, '-'));
 
             foreach (var checkGroup in failedChecksByType.OrderByDescending(g => g.Count()))
             {
@@ -385,7 +389,7 @@ public class RoadmapApplication
         if (failedChecks.Any())
         {
             Console.WriteLine("FAILED CHECKS");
-            Console.WriteLine("-".PadRight(60, '-'));
+            Console.WriteLine("-".PadRight(ConsoleSeparatorWidth, '-'));
 
             foreach (var check in failedChecks.OrderByDescending(c => c.Severity))
             {

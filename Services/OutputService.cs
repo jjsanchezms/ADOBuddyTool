@@ -11,9 +11,7 @@ namespace CreateRoadmapADO.Services;
 public class OutputService
 {
     private readonly ILogger<OutputService> _logger;
-    private readonly JsonSerializerOptions _jsonOptions;
-
-    public OutputService(ILogger<OutputService> logger)
+    private readonly JsonSerializerOptions _jsonOptions; public OutputService(ILogger<OutputService> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -92,7 +90,8 @@ public class OutputService
             _logger.LogError(ex, "Error exporting roadmap to CSV file: {FilePath}", filePath);
             throw;
         }
-    }    public void DisplayInConsole(IEnumerable<RoadmapItem> roadmapItems)
+    }
+    public void DisplayInConsole(IEnumerable<RoadmapItem> roadmapItems)
     {
         try
         {
@@ -217,7 +216,7 @@ public class OutputService
             }
 
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            
+
             switch (extension)
             {
                 case ".json":
@@ -256,10 +255,10 @@ public class OutputService
     private async Task ExportHygieneCheckResultsToCsvAsync(HygieneCheckSummary hygieneResults, string filePath, CancellationToken cancellationToken)
     {
         var csv = new StringBuilder();
-        
+
         // Add header
         csv.AppendLine("CheckName,Passed,Severity,Description,Details,WorkItemId,WorkItemTitle,Recommendation");
-        
+
         // Add data rows
         foreach (var result in hygieneResults.CheckResults)
         {
@@ -275,7 +274,7 @@ public class OutputService
             );
             csv.AppendLine(row);
         }
-        
+
         await File.WriteAllTextAsync(filePath, csv.ToString(), cancellationToken);
     }
 

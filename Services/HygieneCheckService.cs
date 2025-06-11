@@ -31,69 +31,74 @@ public class HygieneCheckService
 {
     private readonly IAzureDevOpsService _azureDevOpsService;
     private readonly ILogger<HygieneCheckService> _logger;
-      // Individual hygiene checks
-    private readonly ReleaseTrainCompletenessCheck _releaseTrainCompletenessCheck;
-    private readonly StatusNotesDocumentationCheck _statusNotesCheck;
-    private readonly FeatureStateConsistencyCheck _featureStateConsistencyCheck;
+
+    // Collection of all hygiene checks
+    private readonly List<IHygieneCheck> _checks;
 
     /// <summary>
     /// Initializes a new instance of the HygieneCheckService with required dependencies.
     /// </summary>
-    /// <param name="azureDevOpsService">Service for Azure DevOps API operations (retrieving work items and relationships)</param>
-    /// <param name="logger">Logger for diagnostic information, debugging, and audit trails</param>    /// <param name="releaseTrainCompletenessCheck">Check for Release Train completeness</param>
+    /// <param name="azureDevOpsService">Service for Azure DevOps API operations</param>
+    /// <param name="logger">Logger for diagnostic information</param>
+    /// <param name="releaseTrainCompletenessCheck">Check for Release Train completeness</param>
     /// <param name="statusNotesCheck">Check for status documentation</param>
     /// <param name="featureStateConsistencyCheck">Check for feature state consistency</param>
-    /// <exception cref="ArgumentNullException">Thrown when any required dependency is null</exception>
     public HygieneCheckService(
-        IAzureDevOpsService azureDevOpsService, 
+        IAzureDevOpsService azureDevOpsService,
         ILogger<HygieneCheckService> logger,
         ReleaseTrainCompletenessCheck releaseTrainCompletenessCheck,
         StatusNotesDocumentationCheck statusNotesCheck,
-        FeatureStateConsistencyCheck featureStateConsistencyCheck)    {
+        FeatureStateConsistencyCheck featureStateConsistencyCheck)
+    {
         _azureDevOpsService = azureDevOpsService ?? throw new ArgumentNullException(nameof(azureDevOpsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _releaseTrainCompletenessCheck = releaseTrainCompletenessCheck ?? throw new ArgumentNullException(nameof(releaseTrainCompletenessCheck));
-        _statusNotesCheck = statusNotesCheck ?? throw new ArgumentNullException(nameof(statusNotesCheck));
-        _featureStateConsistencyCheck = featureStateConsistencyCheck ?? throw new ArgumentNullException(nameof(featureStateConsistencyCheck));
-    }    /// <summary>
-    /// Determines if a Release Train title follows a separator/placeholder pattern that should be ignored for hygiene checks.
-    /// These are typically formatting elements like "----------------------------- CY25 -----------------------------"
-    /// </summary>
-    /// <param name="title">Release Train title to check</param>
-    /// <returns>True if the title appears to be a separator/placeholder pattern</returns>
+
+        // Group all checks into a single collection for easier management
+        _checks = new List<IHygieneCheck>
+        {
+            releaseTrainCompletenessCheck ?? throw new ArgumentNullException(nameof(releaseTrainCompletenessCheck)),
+            statusNotesCheck ?? throw new ArgumentNullException(nameof(statusNotesCheck)),
+            featureStateConsistencyCheck ?? throw new ArgumentNullException(nameof(featureStateConsistencyCheck))
+        };
+    }/// <summary>
+     /// Determines if a Release Train title follows a separator/placeholder pattern that should be ignored for hygiene checks.
+     /// These are typically formatting elements like "----------------------------- CY25 -----------------------------"
+     /// </summary>
+     /// <param name="title">Release Train title to check</param>
+     /// <returns>True if the title appears to be a separator/placeholder pattern</returns>
     private static bool IsSeparatorPattern(string? title)
     {
         if (string.IsNullOrWhiteSpace(title))
             return false;
 
         var cleanTitle = title.Trim();
-        
+
         // Check if title starts with dashes (separator pattern)
         // Pattern examples: "--- Sprint Planning ---", "----------------------------- CY25 -----------------------------"
         return cleanTitle.StartsWith("---");
     }/// <summary>
-    /// Performs comprehensive hygiene checks on Release Trains and Features.
-    /// This method is the main entry point for all ADO hygiene validation checks.
-    /// 
-    /// The hygiene checks include:
-    /// 
-    /// Release Train Checks:
-    /// - Iteration path alignment between Release Trains and Features
-    /// - Status notes/description currency and adequacy
-    /// - Release Train completeness (feature count, tagging)
-    /// - Feature state consistency with Release Train state
-    /// 
-    /// Feature Checks:
-    /// - Related link validation to Release Trains
-    /// - Multiple Release Train relationship warnings
-    /// - Release Train state consistency for linked Release Trains
-    /// 
-    /// The method processes Release Trains first to establish baseline relationships,
-    /// then evaluates Features for proper Release Train linkage and ownership clarity.
-    /// </summary>
-    /// <param name="workItems">Collection of work items (Features and Release Trains) to analyze</param>
-    /// <param name="cancellationToken">Cancellation token for async operation</param>
-    /// <returns>HygieneCheckSummary containing all check results, pass/fail counts, and detailed findings</returns>
+     /// Performs comprehensive hygiene checks on Release Trains and Features.
+     /// This method is the main entry point for all ADO hygiene validation checks.
+     /// 
+     /// The hygiene checks include:
+     /// 
+     /// Release Train Checks:
+     /// - Iteration path alignment between Release Trains and Features
+     /// - Status notes/description currency and adequacy
+     /// - Release Train completeness (feature count, tagging)
+     /// - Feature state consistency with Release Train state
+     /// 
+     /// Feature Checks:
+     /// - Related link validation to Release Trains
+     /// - Multiple Release Train relationship warnings
+     /// - Release Train state consistency for linked Release Trains
+     /// 
+     /// The method processes Release Trains first to establish baseline relationships,
+     /// then evaluates Features for proper Release Train linkage and ownership clarity.
+     /// </summary>
+     /// <param name="workItems">Collection of work items (Features and Release Trains) to analyze</param>
+     /// <param name="cancellationToken">Cancellation token for async operation</param>
+     /// <returns>HygieneCheckSummary containing all check results, pass/fail counts, and detailed findings</returns>
     public async Task<HygieneCheckSummary> PerformHygieneChecksAsync(IEnumerable<WorkItem> workItems, CancellationToken cancellationToken = default)
     {
         var summary = new HygieneCheckSummary();
@@ -105,25 +110,25 @@ public class HygieneCheckService
         var releaseTrains = workItemsList
             .Where(w => w.WorkItemType == "Release Train" && !IsSeparatorPattern(w.Title))
             .ToList();
-        
+
         // Find all Features for additional hygiene checks
         var features = workItemsList
             .Where(w => w.WorkItemType == "Feature")
             .ToList();
-        
+
         // Log any separator patterns found for debugging
         var separatorPatterns = workItemsList
             .Where(w => w.WorkItemType == "Release Train" && IsSeparatorPattern(w.Title))
             .ToList();
-            
+
         if (separatorPatterns.Any())
         {
-            _logger.LogInformation("Excluding {Count} Release Train separator patterns from hygiene checks: {Titles}", 
-                separatorPatterns.Count, 
+            _logger.LogInformation("Excluding {Count} Release Train separator patterns from hygiene checks: {Titles}",
+                separatorPatterns.Count,
                 string.Join(", ", separatorPatterns.Select(sp => $"#{sp.Id} ({sp.Title})")));
         }
-        
-        _logger.LogInformation("Found {Count} Release Trains and {FeatureCount} Features to check (excluding {ExcludedCount} separator patterns)", 
+
+        _logger.LogInformation("Found {Count} Release Trains and {FeatureCount} Features to check (excluding {ExcludedCount} separator patterns)",
             releaseTrains.Count, features.Count, separatorPatterns.Count);
 
         // Process Release Trains
@@ -133,7 +138,7 @@ public class HygieneCheckService
             {
                 // Get the Release Train with its relations
                 var releaseTrainWithRelations = await _azureDevOpsService.GetWorkItemWithRelationsAsync(releaseTrain.Id, cancellationToken);
-                  
+
                 if (releaseTrainWithRelations?.Relations == null)
                 {
                     summary.CheckResults.Add(new HygieneCheckResult
@@ -154,12 +159,12 @@ public class HygieneCheckService
                 // Get related and child feature IDs
                 var allRelations = releaseTrainWithRelations.Relations.ToList();
                 var relationshipTypes = allRelations.Select(r => r.Rel).Distinct().ToList();
-                
-                _logger.LogInformation("Release Train {Id} has relationships of types: {RelationshipTypes}", 
+
+                _logger.LogInformation("Release Train {Id} has relationships of types: {RelationshipTypes}",
                     releaseTrain.Id, string.Join(", ", relationshipTypes));
-                
+
                 var relatedFeatureIds = releaseTrainWithRelations.Relations
-                    .Where(r => r.Rel == "System.LinkTypes.Related" || 
+                    .Where(r => r.Rel == "System.LinkTypes.Related" ||
                                r.Rel == "System.LinkTypes.Hierarchy-Forward" ||
                                r.Rel == "System.LinkTypes.Hierarchy-Reverse")
                     .Select(r => r.GetRelatedWorkItemId())
@@ -183,22 +188,17 @@ public class HygieneCheckService
                     WorkItem = releaseTrainWithRelations,
                     RelatedFeatures = relatedFeatures,
                     AllReleaseTrains = releaseTrains
-                };
-
-                // Perform Release Train specific hygiene checks
-                var completenessResults = await _releaseTrainCompletenessCheck.PerformCheckAsync(context, cancellationToken);
-                summary.CheckResults.AddRange(completenessResults);
-
-                var statusResults = await _statusNotesCheck.PerformCheckAsync(context, cancellationToken);
-                summary.CheckResults.AddRange(statusResults);
-
-                var consistencyResults = await _featureStateConsistencyCheck.PerformCheckAsync(context, cancellationToken);
-                summary.CheckResults.AddRange(consistencyResults);
+                };                // Perform Release Train specific hygiene checks using the collection
+                foreach (var check in _checks)
+                {
+                    var checkResults = await check.PerformCheckAsync(context, cancellationToken);
+                    summary.CheckResults.AddRange(checkResults);
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error performing hygiene checks for Release Train {Id}", releaseTrain.Id);
-                
+
                 summary.CheckResults.Add(new HygieneCheckResult
                 {
                     CheckName = "Hygiene Check Error",
@@ -209,11 +209,12 @@ public class HygieneCheckService
                     WorkItemId = releaseTrain.Id,
                     WorkItemTitle = releaseTrain.Title,
                     WorkItemUrl = HygieneCheckContext.GenerateWorkItemUrl(releaseTrain.Id),
-                    Recommendation = "Review work item permissions and data integrity"                });
+                    Recommendation = "Review work item permissions and data integrity"
+                });
             }
         }
 
-        _logger.LogInformation("Completed hygiene checks. {PassedChecks}/{TotalChecks} checks passed", 
+        _logger.LogInformation("Completed hygiene checks. {PassedChecks}/{TotalChecks} checks passed",
             summary.PassedChecks, summary.TotalChecks);
 
         return summary;
