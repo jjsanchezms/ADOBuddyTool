@@ -29,16 +29,12 @@ try
     
     var outputLogger = loggerFactory.CreateLogger<OutputService>();
     var outputService = new OutputService(outputLogger);
-    
-    // Create individual hygiene check instances with their loggers
-    var releaseTrainFeatureCountCheck = new ReleaseTrainFeatureCountCheck(
-        loggerFactory.CreateLogger<ReleaseTrainFeatureCountCheck>());
+      // Create individual hygiene check instances with their loggers
     var iterationPathAlignmentCheck = new IterationPathAlignmentCheck(
         loggerFactory.CreateLogger<IterationPathAlignmentCheck>());
     var releaseTrainCompletenessCheck = new ReleaseTrainCompletenessCheck(
-        releaseTrainFeatureCountCheck, 
         iterationPathAlignmentCheck,
-        loggerFactory.CreateLogger<ReleaseTrainCompletenessCheck>());    var statusNotesDocumentationCheck = new StatusNotesDocumentationCheck(
+        loggerFactory.CreateLogger<ReleaseTrainCompletenessCheck>());var statusNotesDocumentationCheck = new StatusNotesDocumentationCheck(
         loggerFactory.CreateLogger<StatusNotesDocumentationCheck>());
     var featureStateConsistencyCheck = new FeatureStateConsistencyCheck(
         loggerFactory.CreateLogger<FeatureStateConsistencyCheck>());

@@ -23,7 +23,6 @@ namespace CreateRoadmapADO.Services.HygieneChecks;
 /// </summary>
 public class ReleaseTrainCompletenessCheck : IHygieneCheck
 {
-    private readonly ReleaseTrainFeatureCountCheck _featureCountCheck;
     private readonly IterationPathAlignmentCheck _iterationPathCheck;
     private readonly ILogger<ReleaseTrainCompletenessCheck> _logger;
 
@@ -31,16 +30,12 @@ public class ReleaseTrainCompletenessCheck : IHygieneCheck
     public string CheckDescription => "Validates Release Train structural completeness and proper configuration";
 
     public ReleaseTrainCompletenessCheck(
-        ReleaseTrainFeatureCountCheck featureCountCheck,
         IterationPathAlignmentCheck iterationPathCheck,
         ILogger<ReleaseTrainCompletenessCheck> logger)
     {
-        _featureCountCheck = featureCountCheck ?? throw new ArgumentNullException(nameof(featureCountCheck));
         _iterationPathCheck = iterationPathCheck ?? throw new ArgumentNullException(nameof(iterationPathCheck));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
-    public async Task<IEnumerable<HygieneCheckResult>> PerformCheckAsync(HygieneCheckContext context, CancellationToken cancellationToken = default)
+    }    public async Task<IEnumerable<HygieneCheckResult>> PerformCheckAsync(HygieneCheckContext context, CancellationToken cancellationToken = default)
     {
         var releaseTrain = context.WorkItem;
         var relatedFeatures = context.RelatedFeatures;
@@ -50,8 +45,27 @@ public class ReleaseTrainCompletenessCheck : IHygieneCheck
         var results = new List<HygieneCheckResult>();
 
         // Check if Release Train has related features (foundational check)
-        var featureCountResults = await _featureCountCheck.PerformCheckAsync(context, cancellationToken);
-        results.AddRange(featureCountResults);
+        _logger.LogDebug("Checking feature count for Release Train {Id}: {Title}", releaseTrain.Id, releaseTrain.Title);
+
+        var featureCount = relatedFeatures.Count;
+        var hasAdequateFeatures = featureCount >= 1;
+
+        var featureCountResult = new HygieneCheckResult
+        {
+            CheckName = "Release Train Feature Count",
+            Passed = hasAdequateFeatures,
+            Severity = hasAdequateFeatures ? HygieneCheckSeverity.Info : HygieneCheckSeverity.Warning,
+            Description = "Check if Release Train has adequate number of related features",
+            Details = $"Release Train has {featureCount} related features",
+            WorkItemId = releaseTrain.Id,
+            WorkItemTitle = releaseTrain.Title,
+            WorkItemUrl = HygieneCheckContext.GenerateWorkItemUrl(releaseTrain.Id),
+            Recommendation = hasAdequateFeatures
+                ? "Feature count looks appropriate"
+                : "Release Train should have at least one related feature"
+        };
+
+        results.Add(featureCountResult);
 
         // If we have features, perform additional checks
         if (relatedFeatures.Any())
