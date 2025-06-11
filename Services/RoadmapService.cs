@@ -107,10 +107,9 @@ public class RoadmapService
                     currentChildren.Clear();
 
                     _logger.LogInformation("COMPLETED: Previous group '{PreviousTitle}' created. Children list cleared.", currentTitle);
-                }
-
-                // Extract new title from between the markers
-                currentTitle = match.Groups[1].Value.Trim();
+                }                // Extract new title from between the markers
+                var rawTitle = match.Groups[1].Value.Trim();
+                currentTitle = CleanReleaseTrainTitle(rawTitle);
 
                 // Store the pattern item ID for later renaming
                 currentPatternItemId = workItem.Id;
@@ -452,8 +451,35 @@ public class RoadmapService
             "feature" => 30, // 1 month
             "initiative" => 180, // 6 months
             _ => 14 // 2 weeks
-        };
+        }; return startDate.AddDays(estimatedDays);
+    }
 
-        return startDate.AddDays(estimatedDays);
+    /// <summary>
+    /// Cleans a release train title by removing excess dashes and whitespace
+    /// </summary>
+    /// <param name="rawTitle">The raw title extracted from the pattern</param>
+    /// <returns>Clean title with just the core text</returns>
+    private static string CleanReleaseTrainTitle(string rawTitle)
+    {
+        if (string.IsNullOrWhiteSpace(rawTitle))
+            return string.Empty;
+
+        // Remove leading and trailing dashes and whitespace
+        // Handle patterns like "---------- GCCH -----------" -> "GCCH"
+        var cleaned = rawTitle.Trim();
+
+        // Remove leading dashes and spaces
+        while (cleaned.Length > 0 && (cleaned[0] == '-' || char.IsWhiteSpace(cleaned[0])))
+        {
+            cleaned = cleaned.Substring(1);
+        }
+
+        // Remove trailing dashes and spaces
+        while (cleaned.Length > 0 && (cleaned[cleaned.Length - 1] == '-' || char.IsWhiteSpace(cleaned[cleaned.Length - 1])))
+        {
+            cleaned = cleaned.Substring(0, cleaned.Length - 1);
+        }
+
+        return cleaned.Trim();
     }
 }

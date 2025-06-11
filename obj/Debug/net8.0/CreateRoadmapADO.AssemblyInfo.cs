@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CreateRoadmapADO")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+975392ee9ff545a0c3444a4b8c7c730a7ede814b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c0bd78c51b04d08c54b9d843e3150840adf037ae")]
 [assembly: System.Reflection.AssemblyProductAttribute("CreateRoadmapADO")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CreateRoadmapADO")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
