@@ -21,9 +21,9 @@ public class AzureDevOpsOptions
     /// Personal Access Token for authentication
     /// </summary>
     public string PersonalAccessToken { get; set; } = string.Empty;    /// <summary>
-    /// Base URL for Azure DevOps API
-    /// </summary>
-    public string BaseUrl => $"https://dev.azure.com/{Organization}";
+                                                                       /// Base URL for Azure DevOps API
+                                                                       /// </summary>
+    public string BaseUrl => $"https://{Organization}.visualstudio.com";
 
     /// <summary>
     /// Validates the configuration

@@ -147,7 +147,7 @@ public class AzureDevOpsService : IAzureDevOpsService
     {
         try
         {
-            var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,Microsoft.VSTS.Common.AcceptanceCriteria,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank,Microsoft.VSTS.Scheduling.Effort";
+            var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,Skype.StatusNotes,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank,Microsoft.VSTS.Scheduling.Effort";
             var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?fields={fields}&api-version=7.0";
 
             _logger.LogDebug("Making request to: {Url}", url);
@@ -394,7 +394,7 @@ public class AzureDevOpsService : IAzureDevOpsService
     private async Task<IEnumerable<WorkItem>> GetWorkItemsByIdsAsync(IEnumerable<int> workItemIds, CancellationToken cancellationToken)
     {
         var ids = string.Join(",", workItemIds);        // Include the fields parameter to ensure we get all necessary fields including IterationPath
-        var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,Microsoft.VSTS.Common.AcceptanceCriteria,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank,Microsoft.VSTS.Scheduling.Effort";
+        var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,Skype.StatusNotes,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank,Microsoft.VSTS.Scheduling.Effort";
         var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems?ids={ids}&fields={fields}&api-version=7.0";
 
         _logger.LogDebug("Retrieving work items by IDs: {Ids}", ids);
@@ -448,7 +448,7 @@ public class AzureDevOpsService : IAzureDevOpsService
             WorkItemType = GetFieldValue(response.Fields, "System.WorkItemType") ?? string.Empty,
             State = GetFieldValue(response.Fields, "System.State") ?? string.Empty,
             Description = GetFieldValue(response.Fields, "System.Description") ?? string.Empty,
-            StatusNotes = GetFieldValue(response.Fields, "Microsoft.VSTS.Common.AcceptanceCriteria") ?? string.Empty,
+            StatusNotes = GetFieldValue(response.Fields, "Skype.StatusNotes") ?? string.Empty,
             IterationPath = GetFieldValue(response.Fields, "System.IterationPath"),
             Tags = GetFieldValue(response.Fields, "System.Tags") ?? string.Empty,
             StackRank = stackRank,
@@ -704,7 +704,7 @@ public class AzureDevOpsService : IAzureDevOpsService
                 new
                 {
                     op = "replace",
-                    path = "/fields/Microsoft.VSTS.Common.AcceptanceCriteria",
+                    path = "/fields/Skype.StatusNotes",
                     value = newStatusNotes
                 }
             };
