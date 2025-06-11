@@ -87,42 +87,74 @@ Feature 4: ------------
 # Display help
 CreateRoadmapADO --help
 
-# Basic usage (required area path parameter)
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --output summary
+# Basic roadmap generation (required area path parameter)
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --create-roadmap
 
-# With custom area path and limit
-CreateRoadmapADO --area-path "MyProject\\MyTeam" --limit 50
-
-# Export to JSON with custom area path
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --limit 50 --output json
-
-# Export to CSV with custom filename
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --limit 200 --output csv --file my-roadmap.csv
-
-# Show only Release Train creation summary
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --output summary
-
-# Run ADO hygiene checks in addition to roadmap generation
+# Run ADO hygiene checks
 CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --hygiene-checks
 
-# Run only ADO hygiene checks (skip roadmap generation)
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --hygiene-only
+# Update SWAG values for Release Trains
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --swag-updates
 
-# Export hygiene check results to file
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --hygiene-only --file hygiene-report.json
+# Combine multiple operations
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --create-roadmap --hygiene-checks
+
+# Use summary mode for automation
+CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --swag-updates --summary
+
+# Process more work items
+CreateRoadmapADO --area-path "MyProject\\MyTeam" --swag-updates --limit 200
 ```
+
+### Operations
+
+- `--create-roadmap`: Generate roadmap and create Release Train work items from patterns
+- `--hygiene-checks`: Run ADO hygiene checks on Release Trains and Features  
+- `--swag-updates`: Review Release Trains and manage SWAG calculations
+- `--summary`: Enable summary mode (reduced output for automation)
+
+### SWAG Updates Operation
+
+The `--swag-updates` operation provides intelligent SWAG (effort estimation) management for Release Trains:
+
+#### For Auto-Generated Release Trains:
+- **Automatically updates** the Release Train's SWAG value to match the sum of all related Features
+- **Ensures consistency** between Release Train planning and actual Feature effort
+
+#### For Manual Release Trains:
+- **Validates** that the Release Train SWAG matches the sum of related Features
+- **Shows warnings** when there are mismatches to help identify planning discrepancies
+- **Preserves manual values** while providing visibility into inconsistencies
+
+#### Example Output:
+```
+📊 Release Train #12345: 'Q1 2024 Platform Updates'
+   Auto-generated: Yes
+   Related Features: 5 (4 with SWAG, 1 without)
+   Current RT SWAG: 8
+   Calculated SWAG: 13
+   🔄 Updating SWAG from 8 to 13
+
+📊 Release Train #12346: 'Manual Planning Release'
+   Auto-generated: No
+   Related Features: 3 (3 with SWAG, 0 without)
+   Current RT SWAG: 15
+   Calculated SWAG: 12
+   ⚠️  WARNING: Release Train SWAG (15) does not match sum of Features (12)
+```
+
+#### Benefits:
+- **Automated effort tracking** for auto-generated Release Trains
+- **Planning validation** for manual Release Trains
+- **Visibility** into Features missing SWAG estimates
+- **Data consistency** across Release Train hierarchies
 
 ### Options
 
 - `-a, --area-path <path>`: **[REQUIRED]** Azure DevOps area path to filter work items (e.g., "SPOOL\\Resource Provider")
-- `-l, --limit <number>`: Maximum number of Feature work items to retrieve (default: 100)
-- `-o, --output <format>`: Output format: console, json, csv, summary (default: console)
-- `-f, --file <path>`: Output file path (auto-generated if not specified)
-- `--hygiene-checks`: Run ADO hygiene checks in addition to roadmap generation
-- `--hygiene-only`: Run only ADO hygiene checks (skip roadmap generation)
+- `-l, --limit <number>`: Maximum number of work items to retrieve (default: 100)
+- `-s, --summary`: Enable summary mode (reduced output for automation)
 - `-h, --help`: Show help message
-
-## Building and Running
 
 ### Prerequisites
 
@@ -151,8 +183,9 @@ dotnet run -- --area-path "MyProject\\MyTeam" --limit 50 --output json
 - **Release Train Creation**: Automatically creates Release Train work items from special title patterns
 - **Pattern Processing**: Recognizes title patterns like `----- Title -----rt` to group features into release trains
 - **Automatic Error Recovery**: When Features reference non-existent Release Train IDs, automatically creates new Release Trains and updates Feature titles
+- **SWAG Management**: Intelligent SWAG (effort estimation) calculation and validation for Release Trains
 - **ADO Hygiene Checks**: Comprehensive assessment of Release Train and Feature work item health
-- **Multiple Output Formats**: Console display, JSON export, CSV export, summary-only mode
+- **Multiple Operations**: Support for roadmap generation, hygiene checks, and SWAG updates
 - **Roadmap Generation**: Converts work items to roadmap items with timeline estimation
 - **Operation Tracking**: Provides detailed summary of Release Train creation and update operations
 - **Simplified Architecture**: Clean separation of concerns without over-engineering

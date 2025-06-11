@@ -13,12 +13,12 @@ public interface IAzureDevOpsService : IDisposable
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of Feature work items</returns>
     Task<IEnumerable<WorkItem>> GetWorkItemsAsync(CancellationToken cancellationToken = default);    /// <summary>
-    /// Retrieves Feature work items from Azure DevOps with limit
-    /// </summary>
-    /// <param name="limit">Maximum number of work items to retrieve</param>
-    /// <param name="areaPath">Area path to filter work items</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Collection of Feature work items</returns>
+                                                                                                     /// Retrieves Feature work items from Azure DevOps with limit
+                                                                                                     /// </summary>
+                                                                                                     /// <param name="limit">Maximum number of work items to retrieve</param>
+                                                                                                     /// <param name="areaPath">Area path to filter work items</param>
+                                                                                                     /// <param name="cancellationToken">Cancellation token</param>
+                                                                                                     /// <returns>Collection of Feature work items</returns>
     Task<IEnumerable<WorkItem>> GetWorkItemsAsync(int limit, string areaPath, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -55,13 +55,13 @@ public interface IAzureDevOpsService : IDisposable
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Work item details including relations</returns>
     Task<WorkItem?> GetWorkItemWithRelationsAsync(int workItemId, CancellationToken cancellationToken = default);    /// <summary>
-    /// Checks if a work item has a related auto-generated Release Train
-    /// </summary>
-    /// <param name="workItemId">Work item ID to check</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The ID of the existing related item, or 0 if none exists</returns>
+                                                                                                                     /// Checks if a work item has a related auto-generated Release Train
+                                                                                                                     /// </summary>
+                                                                                                                     /// <param name="workItemId">Work item ID to check</param>
+                                                                                                                     /// <param name="cancellationToken">Cancellation token</param>
+                                                                                                                     /// <returns>The ID of the existing related item, or 0 if none exists</returns>
     Task<int> GetExistingRelatedParentItemIdAsync(int workItemId, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Retrieves work items by WIQL query
     /// </summary>
@@ -78,14 +78,21 @@ public interface IAzureDevOpsService : IDisposable
     /// <param name="patternItemId">ID of the pattern work item that triggered this creation</param>
     /// <returns>The ID of the created Release Train work item</returns>
     Task<int> CreateReleaseTrainAsync(List<int> children, string title, int patternItemId = 0);
-    
     /// <summary>
     /// Updates a work item's title
     /// </summary>    /// <param name="workItemId">ID of the work item to update</param>
     /// <param name="newTitle">The new title for the work item</param>
     /// <returns>Task representing the asynchronous operation</returns>
     Task UpdateWorkItemTitleAsync(int workItemId, string newTitle);
-    
+
+    /// <summary>
+    /// Updates a work item's SWAG (effort) value
+    /// </summary>
+    /// <param name="workItemId">ID of the work item to update</param>
+    /// <param name="swagValue">The new SWAG value</param>
+    /// <returns>Task representing the asynchronous operation</returns>
+    Task UpdateWorkItemSwagAsync(int workItemId, double swagValue);
+
     /// <summary>
     /// Creates a specific relation between two work items
     /// </summary>

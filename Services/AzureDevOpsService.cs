@@ -143,12 +143,11 @@ public class AzureDevOpsService : IAzureDevOpsService
             throw;
         }
     }
-
     public async Task<WorkItem?> GetWorkItemByIdAsync(int workItemId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank";
+            var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank,Microsoft.VSTS.Scheduling.Effort";
             var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?fields={fields}&api-version=7.0";
 
             _logger.LogDebug("Making request to: {Url}", url);
@@ -396,7 +395,7 @@ public class AzureDevOpsService : IAzureDevOpsService
     {
         var ids = string.Join(",", workItemIds);
         // Include the fields parameter to ensure we get all necessary fields including IterationPath
-        var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank";
+        var fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Description,System.IterationPath,System.Tags,Microsoft.VSTS.Common.StackRank,Microsoft.VSTS.Scheduling.Effort";
         var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems?ids={ids}&fields={fields}&api-version=7.0";
 
         _logger.LogDebug("Retrieving work items by IDs: {Ids}", ids);
@@ -443,7 +442,6 @@ public class AzureDevOpsService : IAzureDevOpsService
                 Console.WriteLine($"DEBUG: Failed to parse StackRank value: '{stackRankValue}'");
             }
         }
-
         return new WorkItem
         {
             Id = response.Id,
@@ -454,10 +452,10 @@ public class AzureDevOpsService : IAzureDevOpsService
             IterationPath = GetFieldValue(response.Fields, "System.IterationPath"),
             Tags = GetFieldValue(response.Fields, "System.Tags") ?? string.Empty,
             StackRank = stackRank,
+            Swag = GetSwagValue(response.Fields),
             Relations = new List<WorkItemRelation>() // Empty relations list since we didn't request them
         };
     }
-
     private WorkItem ConvertToWorkItemWithRelations(WorkItemResponse? response)
     {
         // Get the base work item without relations
@@ -482,7 +480,6 @@ public class AzureDevOpsService : IAzureDevOpsService
 
         return workItem;
     }
-
     private static string? GetFieldValue(Dictionary<string, JsonElement> fields, string key)
     {
         if (fields.TryGetValue(key, out var element))
@@ -507,6 +504,16 @@ public class AzureDevOpsService : IAzureDevOpsService
             {
                 return displayName.GetString();
             }
+        }
+        return null;
+    }
+
+    private static double? GetSwagValue(Dictionary<string, JsonElement> fields)
+    {
+        var swagValue = GetFieldValue(fields, "Microsoft.VSTS.Scheduling.Effort");
+        if (swagValue != null && double.TryParse(swagValue, out var swag))
+        {
+            return swag;
         }
         return null;
     }
@@ -588,7 +595,6 @@ public class AzureDevOpsService : IAzureDevOpsService
 
         _logger.LogInformation($"Successfully created {childrenIds.Count} relations for work item #{parentId}");
     }
-
     public async Task UpdateWorkItemTitleAsync(int workItemId, string newTitle)
     {
         try
@@ -625,6 +631,46 @@ public class AzureDevOpsService : IAzureDevOpsService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating work item #{WorkItemId} title", workItemId);
+            throw;
+        }
+    }
+
+    public async Task UpdateWorkItemSwagAsync(int workItemId, double swagValue)
+    {
+        try
+        {
+            _logger.LogInformation("Updating work item #{WorkItemId} SWAG to: {SwagValue}", workItemId, swagValue);
+
+            var url = $"{_options.BaseUrl}/{_options.Project}/_apis/wit/workitems/{workItemId}?api-version=7.0";
+
+            var patchOperation = new[]
+            {
+                new
+                {
+                    op = "replace",
+                    path = "/fields/Microsoft.VSTS.Scheduling.Effort",
+                    value = swagValue
+                }
+            };
+
+            var jsonContent = JsonSerializer.Serialize(patchOperation, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json-patch+json");
+
+            var response = await _httpClient.PatchAsync(url, content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Failed to update work item #{WorkItemId} SWAG. Status: {StatusCode}, Content: {Content}",
+                    workItemId, response.StatusCode, errorContent);
+                throw new HttpRequestException($"Failed to update work item SWAG with status {response.StatusCode}: {errorContent}");
+            }
+
+            _logger.LogInformation("Successfully updated work item #{WorkItemId} SWAG", workItemId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating work item #{WorkItemId} SWAG", workItemId);
             throw;
         }
     }
