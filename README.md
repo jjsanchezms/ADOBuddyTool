@@ -1,4 +1,4 @@
-# CreateRoadmapADO
+# ADOBuddyTool
 
 A C# .NET 8 console application that generates roadmaps from Azure DevOps Feature work items and automatically creates Release Train work items following SOLID principles.
 
@@ -8,12 +8,24 @@ This application connects to Azure DevOps, retrieves Feature work items from a s
 
 ## Architecture
 
-The application follows clean architecture principles with a simplified structure:
+The application follows clean architecture principles with a layered structure:
 
-- **Models/**: Domain models (WorkItem, RoadmapItem, ReleaseTrainSummary)
-- **Interfaces/**: Service contracts (IAzureDevOpsService for testability)
-- **Services/**: Service implementations with Release Train creation logic
-- **Configuration/**: Configuration classes (AzureDevOpsOptions, AppOptions)
+- **Domain/**: Core business entities, value objects, and domain services
+  - `Entities/`: Domain models (WorkItem, RoadmapItem, ReleaseTrainSummary)
+  - `Services/`: Domain service interfaces and implementations
+  - `ValueObjects/`: Immutable value objects
+- **Application/**: Application layer with commands and error handling
+  - `Commands/`: Command handlers for different operations
+  - `ErrorHandling/`: Centralized error management
+- **Infrastructure/**: External concerns and service implementations
+  - `AzureDevOps/`: Azure DevOps API integration with interfaces and services
+  - `HygieneChecks/`: Health and quality assessment implementations
+  - `Output/`: Output formatting and export services
+  - `Roadmap/`: Roadmap generation and Release Train creation logic
+- **Presentation/**: Application entry point and configuration
+  - `Program.cs`: Main application entry point
+  - `Configuration/`: Configuration classes (AzureDevOpsOptions, AppOptions)
+  - `DependencyInjection/`: Service container and DI configuration
 
 ## Configuration
 
@@ -85,47 +97,56 @@ Feature 4: ------------
 
 ```bash
 # Display help
-CreateRoadmapADO --help
+ADOBuddyTool --help
 
 # Basic roadmap generation (required area path parameter)
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --create-roadmap
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --roadmap
 
 # Run ADO hygiene checks
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --hygiene-checks
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --ado-hygiene
 
-# Update SWAG values for Release Trains
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --swag-updates
+# Update SWAG values for Release Trains (auto-generated only)
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --swag-auto-generated
+
+# Update SWAG values for ALL Release Trains (auto-generated and manual)
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --swag-all
 
 # Combine multiple operations
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --create-roadmap --hygiene-checks
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --roadmap --ado-hygiene
 
-# Use summary mode for automation
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --swag-updates --summary
+# Use quiet mode for automation
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --swag-auto-generated --quiet
+
+# Use verbose mode for detailed output
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --roadmap --verbose
 
 # Process more work items
-CreateRoadmapADO --area-path "MyProject\\MyTeam" --swag-updates --limit 200
+ADOBuddyTool --area-path "MyProject\\MyTeam" --swag-auto-generated --limit 200
 ```
 
 ### Operations
 
-- `--create-roadmap`: Generate roadmap and create Release Train work items from patterns
-- `--hygiene-checks`: Run ADO hygiene checks on Release Trains and Features  
-- `--swag-updates`: Review Release Trains and manage SWAG calculations
-- `--summary`: Enable summary mode (reduced output for automation)
+- `--roadmap`: Generate roadmap and create Release Train work items from patterns
+- `--ado-hygiene`: Run ADO hygiene checks on Release Trains and Features  
+- `--swag-auto-generated`: Review Release Trains and manage SWAG calculations (auto-generated only)
+- `--swag-all`: Update SWAG for ALL Release Trains (auto-generated and manual)
+- `--verbose`: Enable verbose output (detailed logging and progress information)
+- `--quiet`: Enable quiet mode (minimal output, errors only)
 
 ### SWAG Updates Operation
 
-The `--swag-updates` operation provides intelligent SWAG (effort estimation) management for Release Trains using the Acceptance Criteria field:
+The `--swag-auto-generated` operation provides intelligent SWAG (effort estimation) management for Release Trains using the status notes field:
 
 #### For Auto-Generated Release Trains:
-- **Automatically updates** the Release Train's SWAG value in Acceptance Criteria to match the sum of all related Features
+- **Automatically updates** the Release Train's SWAG value in status notes to match the sum of all related Features
 - **Ensures consistency** between Release Train planning and actual Feature effort
-- **Uses `[SWAG: value]` prefix** in the Acceptance Criteria field to store SWAG information
+- **Uses `[SWAG: value]` prefix** in the status notes field to store SWAG information
 
 #### For Manual Release Trains:
-- **Validates** that the Release Train SWAG in Acceptance Criteria matches the sum of related Features
+- **Normal mode** (`--swag-auto-generated`): Shows warnings when SWAG doesn't match Feature sum, preserves manual values
+- **ALL mode** (`--swag-all`): Updates ALL Release Trains regardless of auto-generated tag
+- **Validates** that the Release Train SWAG in status notes matches the sum of related Features
 - **Shows warnings** when there are mismatches to help identify planning discrepancies
-- **Preserves manual values** while providing visibility into inconsistencies
 
 #### Example Output:
 ```
@@ -138,15 +159,15 @@ The `--swag-updates` operation provides intelligent SWAG (effort estimation) man
 
 📊 Release Train #12346: 'Manual Planning Release'
    Auto-generated: No
-   Related Features: 3 (3 with SWAG, 0 without)   Current RT SWAG (from Acceptance Criteria): 15
+   Related Features: 3 (3 with SWAG, 0 without)   Current RT SWAG (from status notes): 15
    Calculated SWAG: 12
-   ⚠️  WARNING: Release Train SWAG in Acceptance Criteria (15) does not match sum of Features (12)
+   ⚠️  WARNING: Release Train SWAG in status notes (15) does not match sum of Features (12)
 ```
 
 #### SWAG Storage Format:
-SWAG values are stored as a prefix in the Release Train's Acceptance Criteria field using the format:
+SWAG values are stored as a prefix in the Release Train's status notes field using the format:
 ```
-[SWAG: 70]This is the original Acceptance Criteria content
+[SWAG: 70]This is the original status notes content
 ```
 
 #### Benefits:
@@ -160,7 +181,8 @@ SWAG values are stored as a prefix in the Release Train's Acceptance Criteria fi
 
 - `-a, --area-path <path>`: **[REQUIRED]** Azure DevOps area path to filter work items (e.g., "SPOOL\\Resource Provider")
 - `-l, --limit <number>`: Maximum number of work items to retrieve (default: 100)
-- `-s, --summary`: Enable summary mode (reduced output for automation)
+- `-v, --verbose`: Enable verbose output (detailed logging and progress information)
+- `-q, --quiet`: Enable quiet mode (minimal output, errors only)
 - `-h, --help`: Show help message
 
 ### Prerequisites
@@ -180,7 +202,7 @@ dotnet build
 dotnet run -- --area-path "SPOOL\\Resource Provider"
 
 # Or with additional arguments
-dotnet run -- --area-path "MyProject\\MyTeam" --limit 50 --output json
+dotnet run -- --area-path "MyProject\\MyTeam" --limit 50 --roadmap
 ```
 
 ## Features
@@ -363,3 +385,20 @@ This application follows clean architecture principles:
 - **Data Integrity Protection**: Prevents broken references while maintaining intended Release Train structure
 - **Seamless Operation**: Recovery happens transparently without interrupting the overall process
 - **Error Recovery Tracking**: Operations summary includes information about created replacement Release Trains
+
+### v2.3 - Enhanced SWAG Management & Architecture Refinement
+- **SWAG Updates ALL Mode**: Added `--swag-all` option to update ALL Release Trains regardless of auto-generated tag
+- **Improved SWAG Storage**: Clarified that SWAG values are stored in status notes field with `[SWAG: value]` prefix format
+- **Enhanced Architecture**: Refined clean architecture structure with proper domain, application, infrastructure, and presentation layers
+- **Better Command Line Options**: Clearer distinction between normal and ALL modes for SWAG updates
+- **Documentation Updates**: Updated README to reflect current architecture and feature set accurately
+- **Comprehensive Interface Analysis**: All 11 interfaces in the project are actively used and properly structured
+
+### v2.4 - Standardized CLI Interface
+- **Standard Verbosity Patterns**: Replaced `--summary` with standard `--verbose`/`--quiet` flags
+- **Simplified Command Names**: Shortened commands to standard patterns (`--roadmap`, `--ado-hygiene`, `--swag-auto-generated`)
+- **Backward Compatibility**: Maintained support for original long-form commands
+- **Improved Help System**: Enhanced help text with clearer usage patterns and examples
+- **CLI Best Practices**: Aligned with .NET CLI and industry-standard command-line interface patterns
+- **Better Output Control**: Default behavior is now normal output, with explicit verbose and quiet modes
+- **Explicit Command Names**: Changed `--hygiene` to `--ado-hygiene` and `--swag` to `--swag-auto-generated` for clarity
