@@ -64,59 +64,36 @@ public class HygieneChecksHandler : ICommandHandler
         if (hygieneResults.ErrorIssues > 0)
             Console.WriteLine($"Error Issues: {hygieneResults.ErrorIssues} 🟠");
         if (hygieneResults.WarningIssues > 0)
-            Console.WriteLine($"Warning Issues: {hygieneResults.WarningIssues} 🟡");
-
-        // Display breakdown by check type for failed checks
-        var failedChecksByType = hygieneResults.CheckResults
+            Console.WriteLine($"Warning Issues: {hygieneResults.WarningIssues} 🟡");        // Display breakdown by recommendation for failed checks
+        var failedChecksByRecommendation = hygieneResults.CheckResults
             .Where(r => !r.Passed)
-            .GroupBy(r => r.CheckName)
+            .GroupBy(r => r.Recommendation)
             .Where(g => g.Any())
             .ToList();
 
-        if (failedChecksByType.Any())
+        if (failedChecksByRecommendation.Any())
         {
             Console.WriteLine();
             Console.WriteLine("ISSUES BY CHECK TYPE");
             Console.WriteLine("-".PadRight(separatorWidth, '-'));
 
-            foreach (var checkGroup in failedChecksByType.OrderByDescending(g => g.Count()))
+            foreach (var recommendationGroup in failedChecksByRecommendation.OrderByDescending(g => g.Count()))
             {
-                var severityIcon = GetMostSevereIcon(checkGroup);
-                Console.WriteLine($"{severityIcon} {checkGroup.Key}: {checkGroup.Count()} issues");
-            }
-        }
+                var severityIcon = GetMostSevereIcon(recommendationGroup);
+                Console.WriteLine($"{severityIcon} {recommendationGroup.Key}: {recommendationGroup.Count()} issues");
 
-        Console.WriteLine();
-
-        // Display failed checks in detail
-        var failedChecks = hygieneResults.CheckResults.Where(r => !r.Passed).ToList();
-        if (failedChecks.Any())
-        {
-            Console.WriteLine("FAILED CHECKS");
-            Console.WriteLine("-".PadRight(separatorWidth, '-'));
-
-            foreach (var check in failedChecks.OrderByDescending(c => c.Severity))
-            {
-                var severityIcon = check.Severity switch
+                // List work items under each recommendation
+                foreach (var check in recommendationGroup.OrderBy(c => c.WorkItemId))
                 {
-                    HygieneCheckSeverity.Critical => "🔴",
-                    HygieneCheckSeverity.Error => "🟠",
-                    HygieneCheckSeverity.Warning => "🟡",
-                    _ => "ℹ️"
-                };
-                Console.WriteLine($"{severityIcon} [{check.Severity.ToString().ToUpper()}] {check.CheckName}");
-                Console.WriteLine($"   Work Item: #{check.WorkItemId} - {check.WorkItemTitle}");
-                Console.WriteLine($"   URL: {check.WorkItemUrl}");
-                Console.WriteLine($"   Issue: {check.Details}");
-                Console.WriteLine($"   Recommendation: {check.Recommendation}");
+                    Console.WriteLine($"{check.WorkItemUrl} - {check.WorkItemTitle}");
+                }
                 Console.WriteLine();
             }
         }
     }
-
-    private static string GetMostSevereIcon(IGrouping<string, HygieneCheckResult> checkGroup)
+    private static string GetMostSevereIcon(IGrouping<string, HygieneCheckResult> recommendationGroup)
     {
-        var mostSevere = checkGroup.Max(c => c.Severity);
+        var mostSevere = recommendationGroup.Max(c => c.Severity);
         return mostSevere switch
         {
             HygieneCheckSeverity.Critical => "🔴",
