@@ -20,9 +20,7 @@ public class OutputService
         try
         {
             var items = roadmapItems.ToList();
-            _logger.LogInformation("Displaying {Count} roadmap items in console", items.Count);
-
-            // Keep all console output for roadmap display - this is user-facing output
+            _logger.LogInformation("Displaying {Count} roadmap items in console", items.Count);            // Keep all console output for roadmap display - this is user-facing output
             Console.WriteLine();
             Console.WriteLine("=== ROADMAP (Sorted by StackRank) ===");
             Console.WriteLine();
@@ -33,8 +31,7 @@ public class OutputService
                 return;
             }
 
-            // Display table header with improved clarity
-            Console.WriteLine($"{"ID",-5} {"StackRank",-12} {"Type",-10} {"Status",-12} {"Title",-40}");
+            // Display table header with improved clarity            Console.WriteLine($"{"ID",-5} {"StackRank",-12} {"Type",-10} {"Status",-12} {"Title",-40}");
             Console.WriteLine("(Lower StackRank values appear first, items with N/A appear last)");
             Console.WriteLine(new string('=', 80));
 
@@ -43,14 +40,8 @@ public class OutputService
                 DisplayRoadmapItem(item);
                 Console.WriteLine(new string('-', 80));
             }
-
             Console.WriteLine();
-            Console.WriteLine($"Total Items: {items.Count}");
-            Console.WriteLine($"Not Started: {items.Count(i => i.Status == RoadmapItemStatus.NotStarted)}");
-            Console.WriteLine($"In Progress: {items.Count(i => i.Status == RoadmapItemStatus.InProgress)}");
-            Console.WriteLine($"Completed: {items.Count(i => i.Status == RoadmapItemStatus.Completed)}");
-            Console.WriteLine($"Blocked: {items.Count(i => i.Status == RoadmapItemStatus.Blocked)}");
-            Console.WriteLine($"Cancelled: {items.Count(i => i.Status == RoadmapItemStatus.Cancelled)}");
+            ShowSummaryStatistics(items);
         }
         catch (Exception ex)
         {
@@ -58,37 +49,53 @@ public class OutputService
             throw;
         }
     }
-
     private static void DisplayRoadmapItem(RoadmapItem item)
     {
-        // Format StackRank with more detail and highlight if it's missing
-        string stackRank;
-        if (item.StackRank.HasValue)
-        {
-            stackRank = $"{item.StackRank:F2}";
-            // Make it more visible with some formatting
-            if (item.StackRank.Value == 0)
-            {
-                stackRank = "0.00 (!)"; // Emphasize zero values
-            }
-        }
-        else
-        {
-            stackRank = "N/A (!)"; // Make missing values stand out
-        }
-        // Format display in table-like structure
-        Console.WriteLine($"{item.Id,-5} {stackRank,-12} {item.Type,-10} {item.Status,-12} {TruncateString(item.Title, 40),-40}");
+        // Show the main row with basic info
+        var stackRankDisplay = FormatStackRankForDisplay(item.StackRank); var shortTitle = TruncateString(item.Title, 40);
 
-        // Show description on next line with indentation
-        Console.WriteLine($"      Description: {TruncateString(item.Description, 72)}");
+        Console.WriteLine($"{item.Id,-5} {stackRankDisplay,-12} {item.Type,-10} {item.Status,-12} {shortTitle,-40}");
 
-        // Always show StackRank info with details about how it affects sorting
-        Console.WriteLine($"      StackRank: {(item.StackRank.HasValue ? $"{item.StackRank:F2} (lower values appear first)" : "Not set - will appear at the end")}");
+        // Show additional details with clear indentation
+        ShowItemDetails(item);
+    }
 
-        if (item.Dependencies.Any())
+    private static string FormatStackRankForDisplay(double? stackRank)
+    {
+        if (!stackRank.HasValue)
+            return "N/A (!)";
+
+        if (stackRank.Value == 0)
+            return "0.00 (!)";
+
+        return $"{stackRank:F2}";
+    }
+
+    private static void ShowItemDetails(RoadmapItem item)
+    {
+        // Description
+        Console.WriteLine($"{DisplayConstants.IndentSpaces}Description: {TruncateString(item.Description, DisplayConstants.DescriptionMaxLength)}");
+
+        // StackRank explanation
+        var stackRankExplanation = item.StackRank.HasValue
+            ? $"{item.StackRank:F2} (lower values appear first)"
+            : "Not set - will appear at the end";
+        Console.WriteLine($"{DisplayConstants.IndentSpaces}StackRank: {stackRankExplanation}");
+
+        // Dependencies (only if they exist)        if (item.Dependencies.Any())
         {
-            Console.WriteLine($"      Dependencies: {string.Join(", ", item.Dependencies)}");
+            Console.WriteLine($"{DisplayConstants.IndentSpaces}Dependencies: {string.Join(", ", item.Dependencies)}");
         }
+    }
+
+    private static void ShowSummaryStatistics(List<RoadmapItem> items)
+    {
+        Console.WriteLine($"Total Items: {items.Count}");
+        Console.WriteLine($"Not Started: {items.Count(i => i.Status == RoadmapItemStatus.NotStarted)}");
+        Console.WriteLine($"In Progress: {items.Count(i => i.Status == RoadmapItemStatus.InProgress)}");
+        Console.WriteLine($"Completed: {items.Count(i => i.Status == RoadmapItemStatus.Completed)}");
+        Console.WriteLine($"Blocked: {items.Count(i => i.Status == RoadmapItemStatus.Blocked)}");
+        Console.WriteLine($"Cancelled: {items.Count(i => i.Status == RoadmapItemStatus.Cancelled)}");
     }
     private static string TruncateString(string value, int maxLength)
     {
