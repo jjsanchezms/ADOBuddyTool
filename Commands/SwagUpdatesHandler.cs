@@ -1,3 +1,4 @@
+using CreateRoadmapADO.ErrorHandling;
 using CreateRoadmapADO.Models;
 using CreateRoadmapADO.Services;
 using Microsoft.Extensions.Logging;
@@ -53,14 +54,28 @@ public class SwagUpdatesHandler : ICommandHandler
 
             var (updatedCount, warningCount) = await ProcessReleaseTrains(releaseTrains, options);
 
-            DisplaySwagUpdatesSummary(releaseTrains.Count, updatedCount, warningCount, options, separatorWidth);
-
-            return CommandResult.SuccessResult($"SWAG updates completed - Updated: {updatedCount}, Warnings: {warningCount}");
+            DisplaySwagUpdatesSummary(releaseTrains.Count, updatedCount, warningCount, options, separatorWidth); return CommandResult.SuccessResult($"SWAG updates completed - Updated: {updatedCount}, Warnings: {warningCount}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during SWAG updates");
-            return CommandResult.FailureResult($"SWAG updates failed: {ex.Message}");
+            var error = _services.ErrorHandler.HandleException(ex, new Dictionary<string, object>
+            {
+                ["Operation"] = "SWAG Updates",
+                ["WorkItemCount"] = workItems.Count(),
+                ["AreaPath"] = options.AreaPath ?? "Unknown",
+                ["Options"] = options
+            });
+
+            _logger.LogError(ex, "Error during SWAG updates: {ErrorCode}", error.Code);
+
+            // Display user-friendly error message
+            Console.WriteLine($"\n❌ {error.UserFriendlyMessage}");
+            if (error.RecoveryActions.Any())
+            {
+                Console.WriteLine($"💡 {string.Join("\n💡 ", error.RecoveryActions)}");
+            }
+
+            return CommandResult.FailureResult(error.UserFriendlyMessage);
         }
     }
 
@@ -163,7 +178,7 @@ public class SwagUpdatesHandler : ICommandHandler
             releaseTrain.Tags.Split(';', StringSplitOptions.RemoveEmptyEntries)
                 .Any(tag => tag.Trim().Equals("auto-generated", StringComparison.OrdinalIgnoreCase));
 
-        var currentSwagFromStatusNotes = CreateRoadmapADO.Services.AzureDevOpsService.ExtractSwagFromDescription(releaseTrain.StatusNotes);
+        var currentSwagFromStatusNotes = _services.SwagService.ExtractSwagFromDescription(releaseTrain.StatusNotes);
 
         return new SwagCalculationInfo
         {

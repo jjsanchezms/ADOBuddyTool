@@ -1,5 +1,6 @@
 using CreateRoadmapADO.Commands;
 using CreateRoadmapADO.Configuration;
+using CreateRoadmapADO.ErrorHandling;
 using CreateRoadmapADO.Interfaces;
 using CreateRoadmapADO.Models;
 using CreateRoadmapADO.Services;
@@ -34,7 +35,23 @@ try
 catch (Exception ex)
 {
     var logger = loggerFactory.CreateLogger<Program>();
-    logger.LogCritical(ex, "Application terminated unexpectedly");
+    var errorHandler = new ErrorHandler(loggerFactory.CreateLogger<ErrorHandler>());
+
+    var error = errorHandler.HandleException(ex, new Dictionary<string, object>
+    {
+        ["Operation"] = "Application Startup",
+        ["Arguments"] = string.Join(" ", args)
+    });
+
+    logger.LogCritical(ex, "Application terminated unexpectedly: {ErrorCode}", error.Code);
+
+    // Display user-friendly error message
+    Console.WriteLine($"\n❌ {error.UserFriendlyMessage}");
+    if (error.RecoveryActions.Any())
+    {
+        Console.WriteLine($"💡 {string.Join("\n💡 ", error.RecoveryActions)}");
+    }
+
     Environment.Exit(1);
 }
 
@@ -136,8 +153,21 @@ public class RoadmapApplication
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error running application");
-            Console.WriteLine($"Error: {ex.Message}");
+            var error = _services.ErrorHandler.HandleException(ex, new Dictionary<string, object>
+            {
+                ["Operation"] = "Application Execution",
+                ["Arguments"] = string.Join(" ", args)
+            });
+
+            _logger.LogError(ex, "Error running application: {ErrorCode}", error.Code);
+
+            // Display user-friendly error message
+            Console.WriteLine($"\n❌ {error.UserFriendlyMessage}");
+            if (error.RecoveryActions.Any())
+            {
+                Console.WriteLine($"💡 {string.Join("\n💡 ", error.RecoveryActions)}");
+            }
+
             Environment.Exit(1);
         }
     }

@@ -1,3 +1,4 @@
+using CreateRoadmapADO.ErrorHandling;
 using CreateRoadmapADO.Models;
 using CreateRoadmapADO.Services;
 using Microsoft.Extensions.Logging;
@@ -37,14 +38,27 @@ public class HygieneChecksHandler : ICommandHandler
             }
 
             var hygieneResults = await _services.Hygiene.PerformHygieneChecksAsync(workItems);
-            DisplayHygieneCheckResults(hygieneResults, separatorWidth);
-
-            return CommandResult.SuccessResult("Hygiene checks completed successfully", hygieneResults);
+            DisplayHygieneCheckResults(hygieneResults, separatorWidth); return CommandResult.SuccessResult("Hygiene checks completed successfully", hygieneResults);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during hygiene checks");
-            return CommandResult.FailureResult($"Hygiene checks failed: {ex.Message}");
+            var error = _services.ErrorHandler.HandleException(ex, new Dictionary<string, object>
+            {
+                ["Operation"] = "Hygiene Checks",
+                ["WorkItemCount"] = workItems.Count(),
+                ["Options"] = options
+            });
+
+            _logger.LogError(ex, "Error during hygiene checks: {ErrorCode}", error.Code);
+
+            // Display user-friendly error message
+            Console.WriteLine($"\n❌ {error.UserFriendlyMessage}");
+            if (error.RecoveryActions.Any())
+            {
+                Console.WriteLine($"💡 {string.Join("\n💡 ", error.RecoveryActions)}");
+            }
+
+            return CommandResult.FailureResult(error.UserFriendlyMessage);
         }
     }
 

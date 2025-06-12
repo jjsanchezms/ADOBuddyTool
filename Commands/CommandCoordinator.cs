@@ -1,3 +1,4 @@
+using CreateRoadmapADO.ErrorHandling;
 using CreateRoadmapADO.Models;
 using CreateRoadmapADO.Services;
 using Microsoft.Extensions.Logging;
@@ -68,8 +69,24 @@ public class CommandCoordinator
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error executing command {CommandName}", handler.CommandName);
-                results.Add(CommandResult.FailureResult($"{handler.CommandName} failed with unexpected error: {ex.Message}"));
+                var error = _services.ErrorHandler.HandleException(ex, new Dictionary<string, object>
+                {
+                    ["Operation"] = "Command Coordination",
+                    ["CommandName"] = handler.CommandName,
+                    ["WorkItemCount"] = workItems.Count()
+                });
+
+                _logger.LogError(ex, "Unexpected error executing command {CommandName}: {ErrorCode}",
+                    handler.CommandName, error.Code);
+
+                // Display user-friendly error message
+                Console.WriteLine($"\n❌ {error.UserFriendlyMessage}");
+                if (error.RecoveryActions.Any())
+                {
+                    Console.WriteLine($"💡 {string.Join("\n💡 ", error.RecoveryActions)}");
+                }
+
+                results.Add(CommandResult.FailureResult(error.UserFriendlyMessage));
             }
         }
 

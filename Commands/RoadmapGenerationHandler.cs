@@ -1,3 +1,4 @@
+using CreateRoadmapADO.ErrorHandling;
 using CreateRoadmapADO.Models;
 using CreateRoadmapADO.Services;
 using Microsoft.Extensions.Logging;
@@ -47,8 +48,23 @@ public class RoadmapGenerationHandler : ICommandHandler
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during roadmap generation");
-            return CommandResult.FailureResult($"Roadmap generation failed: {ex.Message}");
+            var error = _services.ErrorHandler.HandleException(ex, new Dictionary<string, object>
+            {
+                ["Operation"] = "Roadmap Generation",
+                ["WorkItemCount"] = workItems.Count(),
+                ["Options"] = options
+            });
+
+            _logger.LogError(ex, "Error during roadmap generation: {ErrorCode}", error.Code);
+
+            // Display user-friendly error message
+            Console.WriteLine($"\n❌ {error.UserFriendlyMessage}");
+            if (error.RecoveryActions.Any())
+            {
+                Console.WriteLine($"💡 {string.Join("\n💡 ", error.RecoveryActions)}");
+            }
+
+            return CommandResult.FailureResult(error.UserFriendlyMessage);
         }
     }
 

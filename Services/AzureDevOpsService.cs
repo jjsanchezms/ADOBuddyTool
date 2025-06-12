@@ -102,11 +102,6 @@ public class AzureDevOpsService : IAzureDevOpsService
 
             _logger.LogInformation("Found {Count} {WorkItemType} work items, retrieving {Limit}", workItemIds.Count(), workItemType, limitedIds.Count());            // Get the full work item details for the limited set
 
-            Console.WriteLine("Work item IDs received (in order):");
-            foreach (var id in limitedIds)
-            {
-                Console.WriteLine(id);
-            }
             return await GetWorkItemsByIdsAsync(limitedIds, cancellationToken);
         }
         catch (Exception ex)
