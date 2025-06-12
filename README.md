@@ -387,7 +387,7 @@ This application follows clean architecture principles:
 - **Error Recovery Tracking**: Operations summary includes information about created replacement Release Trains
 
 ### v2.3 - Enhanced SWAG Management & Architecture Refinement
-- **SWAG Updates ALL Mode**: Added `--swag-updates all` option to update ALL Release Trains regardless of auto-generated tag
+- **SWAG Updates ALL Mode**: Added `--swag-all` option to update ALL Release Trains regardless of auto-generated tag
 - **Improved SWAG Storage**: Clarified that SWAG values are stored in status notes field with `[SWAG: value]` prefix format
 - **Enhanced Architecture**: Refined clean architecture structure with proper domain, application, infrastructure, and presentation layers
 - **Better Command Line Options**: Clearer distinction between normal and ALL modes for SWAG updates

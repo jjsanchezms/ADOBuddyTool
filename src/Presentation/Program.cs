@@ -190,7 +190,7 @@ public class RoadmapApplication
         if (!options.RunHygieneChecks && !options.CreateRoadmap && !options.SwagUpdates)
         {
             _logger.LogError("At least one operation must be specified");
-            Console.WriteLine("Error: At least one operation must be specified (--hygiene-checks, --create-roadmap, or --swag-updates).");
+            Console.WriteLine("Error: At least one operation must be specified (--hygiene, --roadmap, or --swag).");
             Console.WriteLine();
             ShowHelp();
             return false;
@@ -321,28 +321,23 @@ public class RoadmapApplication
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  # Create roadmap only");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --roadmap");
+        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --roadmap");
         Console.WriteLine();
         Console.WriteLine("  # Run hygiene checks only");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene");
+        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --hygiene");
         Console.WriteLine();
         Console.WriteLine("  # Update SWAG values for Release Trains (auto-generated only)");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --swag");
+        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --swag");
         Console.WriteLine();
         Console.WriteLine("  # Update SWAG values for ALL Release Trains");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --swag-all");
+        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --swag-all");
         Console.WriteLine();
         Console.WriteLine("  # Run multiple operations in quiet mode");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --roadmap --hygiene --quiet");
+        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --roadmap --hygiene --quiet");
         Console.WriteLine();
         Console.WriteLine("  # Process more items with verbose output");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --roadmap --limit 200 --verbose");
+        Console.WriteLine("  dotnet run --area-path \"MyProject\\\\MyTeam\" --roadmap --limit 200 --verbose");
         Console.WriteLine();
-        Console.WriteLine("SWAG Updates Operation:");
-        Console.WriteLine("  • Normal mode (--swag): Only updates auto-generated Release Trains, shows warnings for manual ones");
-        Console.WriteLine("  • ALL mode (--swag-all): Updates ALL Release Trains regardless of auto-generated tag");
-        Console.WriteLine("  • For manual Release Trains (normal mode): Shows warnings if SWAG doesn't match Feature sum");
-        Console.WriteLine("  • Only processes Release Trains with related Feature work items");
-        Console.WriteLine("  • SWAG values are stored as [SWAG: value] prefix in the status notes field");
+
     }
 }

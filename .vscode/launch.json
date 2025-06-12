@@ -10,7 +10,7 @@
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
-                "--create-roadmap"
+                "--roadmap"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
@@ -28,7 +28,7 @@
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
-                "--hygiene-checks"
+                "--hygiene"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
@@ -46,10 +46,9 @@
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
-                "--create-roadmap",
-                "--hygiene-checks",
-                "--output",
-                "summary"
+                "--roadmap",
+                "--hygiene",
+                "--quiet"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
@@ -67,7 +66,7 @@
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
-                "--create-roadmap",
+                "--roadmap",
                 "--limit",
                 "50"
             ],
@@ -79,7 +78,7 @@
             }
         },
         {
-            "name": "Debug - JSON Output",
+            "name": "Debug - Verbose Output",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
@@ -87,11 +86,8 @@
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
-                "--create-roadmap",
-                "--output",
-                "json",
-                "--file",
-                "debug-roadmap.json"
+                "--roadmap",
+                "--verbose"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
@@ -109,7 +105,7 @@
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
-                "--swag-updates"
+                "--swag"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
