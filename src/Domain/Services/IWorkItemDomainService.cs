@@ -1,6 +1,6 @@
-using CreateRoadmapADO.Domain.Entities;
+using ADOBuddyTool.Domain.Entities;
 
-namespace CreateRoadmapADO.Domain.Services;
+namespace ADOBuddyTool.Domain.Services;
 
 /// <summary>
 /// Domain service interface for work item business logic operations

@@ -1,9 +1,9 @@
-using CreateRoadmapADO.Application.ErrorHandling;
-using CreateRoadmapADO.Domain.Entities;
-using CreateRoadmapADO.Presentation.DependencyInjection;
+using ADOBuddyTool.Application.ErrorHandling;
+using ADOBuddyTool.Domain.Entities;
+using ADOBuddyTool.Presentation.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace CreateRoadmapADO.Application.Commands;
+namespace ADOBuddyTool.Application.Commands;
 
 /// <summary>
 /// Coordinates the execution of different command handlers based on user options

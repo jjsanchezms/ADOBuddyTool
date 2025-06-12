@@ -1,6 +1,6 @@
-using CreateRoadmapADO.Domain.Entities;
+using ADOBuddyTool.Domain.Entities;
 
-namespace CreateRoadmapADO.Infrastructure.AzureDevOps.Interfaces;
+namespace ADOBuddyTool.Infrastructure.AzureDevOps.Interfaces;
 
 /// <summary>
 /// Interface for hygiene check implementations

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 
-namespace CreateRoadmapADO.Presentation.Configuration;
+namespace ADOBuddyTool.Presentation.Configuration;
 
 /// <summary>
 /// Simple configuration reader that loads settings from appsettings.json

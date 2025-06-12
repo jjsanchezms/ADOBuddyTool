@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace CreateRoadmapADO.Application.ErrorHandling;
+namespace ADOBuddyTool.Application.ErrorHandling;
 
 /// <summary>
 /// Represents different categories of application errors

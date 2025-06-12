@@ -1,14 +1,14 @@
-using CreateRoadmapADO.Application.ErrorHandling;
-using CreateRoadmapADO.Domain.Services;
-using CreateRoadmapADO.Infrastructure.AzureDevOps.Interfaces;
-using CreateRoadmapADO.Infrastructure.AzureDevOps.Services;
-using CreateRoadmapADO.Infrastructure.HygieneChecks;
-using CreateRoadmapADO.Infrastructure.HygieneChecks.Checks;
-using CreateRoadmapADO.Infrastructure.Output;
-using CreateRoadmapADO.Infrastructure.Roadmap;
+using ADOBuddyTool.Application.ErrorHandling;
+using ADOBuddyTool.Domain.Services;
+using ADOBuddyTool.Infrastructure.AzureDevOps.Interfaces;
+using ADOBuddyTool.Infrastructure.AzureDevOps.Services;
+using ADOBuddyTool.Infrastructure.HygieneChecks;
+using ADOBuddyTool.Infrastructure.HygieneChecks.Checks;
+using ADOBuddyTool.Infrastructure.Output;
+using ADOBuddyTool.Infrastructure.Roadmap;
 using Microsoft.Extensions.Logging;
 
-namespace CreateRoadmapADO.Presentation.DependencyInjection;
+namespace ADOBuddyTool.Presentation.DependencyInjection;
 
 /// <summary>
 /// Simple service container to reduce dependency injection complexity

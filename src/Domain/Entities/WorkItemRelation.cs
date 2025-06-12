@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace CreateRoadmapADO.Domain.Entities;
+namespace ADOBuddyTool.Domain.Entities;
 
 /// <summary>
 /// Represents a relation between work items

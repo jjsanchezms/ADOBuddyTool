@@ -1,8 +1,8 @@
-using CreateRoadmapADO.Infrastructure.AzureDevOps.Interfaces;
-using CreateRoadmapADO.Domain.Entities;
+using ADOBuddyTool.Infrastructure.AzureDevOps.Interfaces;
+using ADOBuddyTool.Domain.Entities;
 using Microsoft.Extensions.Logging;
 
-namespace CreateRoadmapADO.Infrastructure.AzureDevOps.Services;
+namespace ADOBuddyTool.Infrastructure.AzureDevOps.Services;
 
 /// <summary>
 /// Composite service that implements IAzureDevOpsService by delegating to focused services

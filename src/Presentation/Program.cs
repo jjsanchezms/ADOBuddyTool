@@ -1,10 +1,10 @@
-using CreateRoadmapADO.Application.Commands;
-using CreateRoadmapADO.Application.ErrorHandling;
-using CreateRoadmapADO.Domain.Entities;
-using CreateRoadmapADO.Infrastructure.AzureDevOps.Interfaces;
-using CreateRoadmapADO.Infrastructure.HygieneChecks;
-using CreateRoadmapADO.Presentation.Configuration;
-using CreateRoadmapADO.Presentation.DependencyInjection;
+using ADOBuddyTool.Application.Commands;
+using ADOBuddyTool.Application.ErrorHandling;
+using ADOBuddyTool.Domain.Entities;
+using ADOBuddyTool.Infrastructure.AzureDevOps.Interfaces;
+using ADOBuddyTool.Infrastructure.HygieneChecks;
+using ADOBuddyTool.Presentation.Configuration;
+using ADOBuddyTool.Presentation.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 // Parse arguments early to configure logging appropriately
@@ -120,7 +120,7 @@ public class RoadmapApplication
 
             if (!options.Quiet)
             {
-                _logger.LogInformation("Starting CreateRoadmapADO application");
+                _logger.LogInformation("Starting ADOBuddyTool application");
             }
 
             var workItems = await GetWorkItemsAsync(options);
@@ -190,7 +190,7 @@ public class RoadmapApplication
         if (!options.RunHygieneChecks && !options.CreateRoadmap && !options.SwagUpdates)
         {
             _logger.LogError("At least one operation must be specified");
-            Console.WriteLine("Error: At least one operation must be specified (--hygiene, --roadmap, or --swag).");
+            Console.WriteLine("Error: At least one operation must be specified (--ado-hygiene, --roadmap, or --swag-auto-generated).");
             Console.WriteLine();
             ShowHelp();
             return false;
@@ -270,13 +270,13 @@ public class RoadmapApplication
                 case "--verbose" or "-v":
                     options.Verbose = true;
                     break;
-                case "--hygiene-checks" or "--hygiene":
+                case "--hygiene-checks" or "--ado-hygiene":
                     options.RunHygieneChecks = true;
                     break;
                 case "--create-roadmap" or "--roadmap":
                     options.CreateRoadmap = true;
                     break;
-                case "--swag-updates" or "--swag":
+                case "--swag-updates" or "--swag-auto-generated":
                     options.SwagUpdates = true;
                     // Check if the next argument is "all"
                     if (i + 1 < args.Length && args[i + 1].ToLowerInvariant() == "all")
@@ -300,17 +300,16 @@ public class RoadmapApplication
     }
     private static void ShowHelp()
     {
-        Console.WriteLine("CreateRoadmapADO - Generate roadmaps from Azure DevOps Feature work items");
-        Console.WriteLine();
-        Console.WriteLine("Usage: CreateRoadmapADO --area-path <path> (--hygiene | --roadmap | --swag) [options]");
+        Console.WriteLine("ADOBuddyTool - Generate roadmaps from Azure DevOps Feature work items");
+        Console.WriteLine(); Console.WriteLine("Usage: ADOBuddyTool --area-path <path> (--ado-hygiene | --roadmap | --swag-auto-generated) [options]");
         Console.WriteLine();
         Console.WriteLine("Required:");
         Console.WriteLine("  -a, --area-path <path>    Azure DevOps area path to filter work items (e.g., \"SPOOL\\\\Resource Provider\")");
         Console.WriteLine();
         Console.WriteLine("Operations (at least one required):");
-        Console.WriteLine("  --hygiene                 Run ADO hygiene checks on Release Trains and Features");
+        Console.WriteLine("  --ado-hygiene             Run ADO hygiene checks on Release Trains and Features");
         Console.WriteLine("  --roadmap                 Generate roadmap and create Release Train work items from patterns");
-        Console.WriteLine("  --swag                    Review Release Trains and manage SWAG calculations (auto-generated only)");
+        Console.WriteLine("  --swag-auto-generated     Review Release Trains and manage SWAG calculations (auto-generated only)");
         Console.WriteLine("  --swag-all                Update SWAG for ALL Release Trains (auto-generated and manual)");
         Console.WriteLine();
         Console.WriteLine("Options:");
@@ -322,22 +321,23 @@ public class RoadmapApplication
         Console.WriteLine("Examples:");
         Console.WriteLine("  # Create roadmap only");
         Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --roadmap");
-        Console.WriteLine();
-        Console.WriteLine("  # Run hygiene checks only");
-        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --hygiene");
-        Console.WriteLine();
-        Console.WriteLine("  # Update SWAG values for Release Trains (auto-generated only)");
-        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --swag");
+        Console.WriteLine(); Console.WriteLine("  # Run hygiene checks only");
+        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --ado-hygiene");
+        Console.WriteLine(); Console.WriteLine("  # Update SWAG values for Release Trains (auto-generated only)");
+        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --swag-auto-generated");
         Console.WriteLine();
         Console.WriteLine("  # Update SWAG values for ALL Release Trains");
         Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --swag-all");
-        Console.WriteLine();
-        Console.WriteLine("  # Run multiple operations in quiet mode");
-        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --roadmap --hygiene --quiet");
+        Console.WriteLine(); Console.WriteLine("  # Run multiple operations in quiet mode");
+        Console.WriteLine("  dotnet run --area-path \"SPOOL\\\\Resource Provider\" --roadmap --ado-hygiene --quiet");
         Console.WriteLine();
         Console.WriteLine("  # Process more items with verbose output");
-        Console.WriteLine("  dotnet run --area-path \"MyProject\\\\MyTeam\" --roadmap --limit 200 --verbose");
-        Console.WriteLine();
-
+        Console.WriteLine("  dotnet run --area-path \"MyProject\\\\MyTeam\" --roadmap --limit 200 --verbose"); Console.WriteLine();
+        Console.WriteLine("SWAG Updates Operation:");
+        Console.WriteLine("  • Normal mode (--swag-auto-generated): Only updates auto-generated Release Trains, shows warnings for manual ones");
+        Console.WriteLine("  • ALL mode (--swag-all): Updates ALL Release Trains regardless of auto-generated tag");
+        Console.WriteLine("  • For manual Release Trains (normal mode): Shows warnings if SWAG doesn't match Feature sum");
+        Console.WriteLine("  • Only processes Release Trains with related Feature work items");
+        Console.WriteLine("  • SWAG values are stored as [SWAG: value] prefix in the status notes field");
     }
 }

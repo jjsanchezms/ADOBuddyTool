@@ -1,4 +1,4 @@
-# CreateRoadmapADO
+# ADOBuddyTool
 
 A C# .NET 8 console application that generates roadmaps from Azure DevOps Feature work items and automatically creates Release Train work items following SOLID principles.
 
@@ -97,45 +97,45 @@ Feature 4: ------------
 
 ```bash
 # Display help
-CreateRoadmapADO --help
+ADOBuddyTool --help
 
 # Basic roadmap generation (required area path parameter)
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --roadmap
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --roadmap
 
 # Run ADO hygiene checks
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --hygiene
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --ado-hygiene
 
 # Update SWAG values for Release Trains (auto-generated only)
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --swag
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --swag-auto-generated
 
 # Update SWAG values for ALL Release Trains (auto-generated and manual)
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --swag-all
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --swag-all
 
 # Combine multiple operations
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --roadmap --hygiene
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --roadmap --ado-hygiene
 
 # Use quiet mode for automation
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --swag --quiet
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --swag-auto-generated --quiet
 
 # Use verbose mode for detailed output
-CreateRoadmapADO --area-path "SPOOL\\Resource Provider" --roadmap --verbose
+ADOBuddyTool --area-path "SPOOL\\Resource Provider" --roadmap --verbose
 
 # Process more work items
-CreateRoadmapADO --area-path "MyProject\\MyTeam" --swag --limit 200
+ADOBuddyTool --area-path "MyProject\\MyTeam" --swag-auto-generated --limit 200
 ```
 
 ### Operations
 
 - `--roadmap`: Generate roadmap and create Release Train work items from patterns
-- `--hygiene`: Run ADO hygiene checks on Release Trains and Features  
-- `--swag`: Review Release Trains and manage SWAG calculations (auto-generated only)
+- `--ado-hygiene`: Run ADO hygiene checks on Release Trains and Features  
+- `--swag-auto-generated`: Review Release Trains and manage SWAG calculations (auto-generated only)
 - `--swag-all`: Update SWAG for ALL Release Trains (auto-generated and manual)
 - `--verbose`: Enable verbose output (detailed logging and progress information)
 - `--quiet`: Enable quiet mode (minimal output, errors only)
 
 ### SWAG Updates Operation
 
-The `--swag` operation provides intelligent SWAG (effort estimation) management for Release Trains using the status notes field:
+The `--swag-auto-generated` operation provides intelligent SWAG (effort estimation) management for Release Trains using the status notes field:
 
 #### For Auto-Generated Release Trains:
 - **Automatically updates** the Release Train's SWAG value in status notes to match the sum of all related Features
@@ -143,7 +143,7 @@ The `--swag` operation provides intelligent SWAG (effort estimation) management 
 - **Uses `[SWAG: value]` prefix** in the status notes field to store SWAG information
 
 #### For Manual Release Trains:
-- **Normal mode** (`--swag`): Shows warnings when SWAG doesn't match Feature sum, preserves manual values
+- **Normal mode** (`--swag-auto-generated`): Shows warnings when SWAG doesn't match Feature sum, preserves manual values
 - **ALL mode** (`--swag-all`): Updates ALL Release Trains regardless of auto-generated tag
 - **Validates** that the Release Train SWAG in status notes matches the sum of related Features
 - **Shows warnings** when there are mismatches to help identify planning discrepancies
@@ -396,8 +396,9 @@ This application follows clean architecture principles:
 
 ### v2.4 - Standardized CLI Interface
 - **Standard Verbosity Patterns**: Replaced `--summary` with standard `--verbose`/`--quiet` flags
-- **Simplified Command Names**: Shortened commands to standard patterns (`--roadmap`, `--hygiene`, `--swag`)
+- **Simplified Command Names**: Shortened commands to standard patterns (`--roadmap`, `--ado-hygiene`, `--swag-auto-generated`)
 - **Backward Compatibility**: Maintained support for original long-form commands
 - **Improved Help System**: Enhanced help text with clearer usage patterns and examples
 - **CLI Best Practices**: Aligned with .NET CLI and industry-standard command-line interface patterns
 - **Better Output Control**: Default behavior is now normal output, with explicit verbose and quiet modes
+- **Explicit Command Names**: Changed `--hygiene` to `--ado-hygiene` and `--swag` to `--swag-auto-generated` for clarity

@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/CreateRoadmapADO.csproj",
+                "${workspaceFolder}/ADOBuddyTool.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -26,7 +26,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/CreateRoadmapADO.csproj",
+                "${workspaceFolder}/ADOBuddyTool.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -42,7 +42,7 @@
             "args": [
                 "watch",
                 "run",
-                "${workspaceFolder}/CreateRoadmapADO.csproj",
+                "${workspaceFolder}/ADOBuddyTool.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],

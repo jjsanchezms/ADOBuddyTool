@@ -1,6 +1,6 @@
-using CreateRoadmapADO.Domain.Entities;
+using ADOBuddyTool.Domain.Entities;
 
-namespace CreateRoadmapADO.Application.Commands;
+namespace ADOBuddyTool.Application.Commands;
 
 /// <summary>
 /// Interface for command handlers that process work items based on user options

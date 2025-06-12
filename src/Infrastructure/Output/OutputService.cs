@@ -1,9 +1,9 @@
-using CreateRoadmapADO.Domain.Entities;
+using ADOBuddyTool.Domain.Entities;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
 
-namespace CreateRoadmapADO.Infrastructure.Output;
+namespace ADOBuddyTool.Infrastructure.Output;
 
 /// <summary>
 /// Service for output generation in various formats

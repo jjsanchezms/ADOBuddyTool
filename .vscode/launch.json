@@ -6,7 +6,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/ADOBuddyTool.dll",
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
@@ -24,11 +24,11 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/ADOBuddyTool.dll",
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
-                "--hygiene"
+                "--ado-hygiene"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
@@ -42,12 +42,12 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/ADOBuddyTool.dll",
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
                 "--roadmap",
-                "--hygiene",
+                "--ado-hygiene",
                 "--quiet"
             ],
             "cwd": "${workspaceFolder}",
@@ -62,7 +62,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/ADOBuddyTool.dll",
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
@@ -82,7 +82,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/ADOBuddyTool.dll",
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
@@ -101,11 +101,11 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net8.0/CreateRoadmapADO.dll",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/ADOBuddyTool.dll",
             "args": [
                 "--area-path",
                 "SPOOL\\Resource Provider",
-                "--swag"
+                "--swag-auto-generated"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",

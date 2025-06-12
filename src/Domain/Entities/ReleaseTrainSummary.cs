@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace CreateRoadmapADO.Domain.Entities;
+namespace ADOBuddyTool.Domain.Entities;
 
 /// <summary>
 /// Summary of release train creation and update operations

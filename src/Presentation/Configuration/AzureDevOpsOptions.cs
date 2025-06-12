@@ -1,4 +1,4 @@
-namespace CreateRoadmapADO.Presentation.Configuration;
+namespace ADOBuddyTool.Presentation.Configuration;
 
 /// <summary>
 /// Configuration settings for Azure DevOps connection

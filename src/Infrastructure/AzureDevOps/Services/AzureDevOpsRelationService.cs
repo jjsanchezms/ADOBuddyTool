@@ -1,10 +1,10 @@
-using CreateRoadmapADO.Presentation.Configuration;
+using ADOBuddyTool.Presentation.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
-namespace CreateRoadmapADO.Infrastructure.AzureDevOps.Services;
+namespace ADOBuddyTool.Infrastructure.AzureDevOps.Services;
 
 /// <summary>
 /// Service for Azure DevOps work item relationships

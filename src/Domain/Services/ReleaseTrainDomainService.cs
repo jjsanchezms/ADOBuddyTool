@@ -1,9 +1,9 @@
-using CreateRoadmapADO.Domain.Entities;
-using CreateRoadmapADO.Domain.Services;
+using ADOBuddyTool.Domain.Entities;
+using ADOBuddyTool.Domain.Services;
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 
-namespace CreateRoadmapADO.Domain.Services;
+namespace ADOBuddyTool.Domain.Services;
 
 /// <summary>
 /// Domain service for Release Train business operations

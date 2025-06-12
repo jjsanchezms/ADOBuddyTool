@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace CreateRoadmapADO.Application.ErrorHandling;
+namespace ADOBuddyTool.Application.ErrorHandling;
 
 /// <summary>
 /// Centralized error handling service that provides consistent error management across the application

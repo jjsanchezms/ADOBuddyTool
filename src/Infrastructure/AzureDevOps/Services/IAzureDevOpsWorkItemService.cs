@@ -1,6 +1,6 @@
-using CreateRoadmapADO.Domain.Entities;
+using ADOBuddyTool.Domain.Entities;
 
-namespace CreateRoadmapADO.Infrastructure.AzureDevOps.Services;
+namespace ADOBuddyTool.Infrastructure.AzureDevOps.Services;
 
 /// <summary>
 /// Service interface for Azure DevOps work item modifications

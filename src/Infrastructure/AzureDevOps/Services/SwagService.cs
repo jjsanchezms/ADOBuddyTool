@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace CreateRoadmapADO.Infrastructure.AzureDevOps.Services;
+namespace ADOBuddyTool.Infrastructure.AzureDevOps.Services;
 
 /// <summary>
 /// Service for SWAG-related operations

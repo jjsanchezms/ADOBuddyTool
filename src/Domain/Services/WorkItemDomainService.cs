@@ -1,8 +1,8 @@
-using CreateRoadmapADO.Domain.Entities;
-using CreateRoadmapADO.Domain.Services;
+using ADOBuddyTool.Domain.Entities;
+using ADOBuddyTool.Domain.Services;
 using Microsoft.Extensions.Logging;
 
-namespace CreateRoadmapADO.Domain.Services;
+namespace ADOBuddyTool.Domain.Services;
 
 /// <summary>
 /// Domain service for work item business logic operations

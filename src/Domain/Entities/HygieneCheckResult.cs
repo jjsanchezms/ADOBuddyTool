@@ -1,4 +1,4 @@
-namespace CreateRoadmapADO.Domain.Entities;
+namespace ADOBuddyTool.Domain.Entities;
 
 /// <summary>
 /// Represents the result of a hygiene check

@@ -1,9 +1,9 @@
-using CreateRoadmapADO.Infrastructure.AzureDevOps.Interfaces;
-using CreateRoadmapADO.Domain.Entities;
-using CreateRoadmapADO.Infrastructure.HygieneChecks.Checks;
+using ADOBuddyTool.Infrastructure.AzureDevOps.Interfaces;
+using ADOBuddyTool.Domain.Entities;
+using ADOBuddyTool.Infrastructure.HygieneChecks.Checks;
 using Microsoft.Extensions.Logging;
 
-namespace CreateRoadmapADO.Infrastructure.HygieneChecks;
+namespace ADOBuddyTool.Infrastructure.HygieneChecks;
 
 /// <summary>
 /// Service for performing comprehensive Azure DevOps hygiene checks on Release Train work items.

@@ -1,12 +1,12 @@
-using CreateRoadmapADO.Presentation.Configuration;
-using CreateRoadmapADO.Domain.Entities;
-using CreateRoadmapADO.Infrastructure.AzureDevOps.Services;
+using ADOBuddyTool.Presentation.Configuration;
+using ADOBuddyTool.Domain.Entities;
+using ADOBuddyTool.Infrastructure.AzureDevOps.Services;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
-namespace CreateRoadmapADO.Infrastructure.AzureDevOps.Services;
+namespace ADOBuddyTool.Infrastructure.AzureDevOps.Services;
 
 /// <summary>
 /// Service for Azure DevOps work item modifications

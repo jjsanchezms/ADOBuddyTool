@@ -1,12 +1,12 @@
-using CreateRoadmapADO.Presentation.Configuration;
-using CreateRoadmapADO.Infrastructure.AzureDevOps.Interfaces;
-using CreateRoadmapADO.Domain.Entities;
+using ADOBuddyTool.Presentation.Configuration;
+using ADOBuddyTool.Infrastructure.AzureDevOps.Interfaces;
+using ADOBuddyTool.Domain.Entities;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
-namespace CreateRoadmapADO.Infrastructure.AzureDevOps;
+namespace ADOBuddyTool.Infrastructure.AzureDevOps;
 
 /// <summary>
 /// Service for interacting with Azure DevOps API

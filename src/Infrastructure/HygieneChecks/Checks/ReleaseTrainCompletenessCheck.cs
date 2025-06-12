@@ -1,8 +1,8 @@
-using CreateRoadmapADO.Infrastructure.AzureDevOps.Interfaces;
-using CreateRoadmapADO.Domain.Entities;
+using ADOBuddyTool.Infrastructure.AzureDevOps.Interfaces;
+using ADOBuddyTool.Domain.Entities;
 using Microsoft.Extensions.Logging;
 
-namespace CreateRoadmapADO.Infrastructure.HygieneChecks.Checks;
+namespace ADOBuddyTool.Infrastructure.HygieneChecks.Checks;
 
 /// <summary>
 /// Validates Release Train structural completeness and proper configuration.

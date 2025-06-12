@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace CreateRoadmapADO.Services;
+namespace ADOBuddyTool.Services;
 
 /// <summary>
 /// Base service class with common logger setup

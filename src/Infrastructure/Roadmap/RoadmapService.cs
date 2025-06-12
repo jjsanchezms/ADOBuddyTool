@@ -1,10 +1,10 @@
-using CreateRoadmapADO.Infrastructure.AzureDevOps.Interfaces;
-using CreateRoadmapADO.Domain.Entities;
+using ADOBuddyTool.Infrastructure.AzureDevOps.Interfaces;
+using ADOBuddyTool.Domain.Entities;
 using Microsoft.Extensions.Logging;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace CreateRoadmapADO.Infrastructure.Roadmap;
+namespace ADOBuddyTool.Infrastructure.Roadmap;
 
 /// <summary>
 /// Service for generating and managing roadmaps from work items
