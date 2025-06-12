@@ -27,7 +27,7 @@ public class RoadmapGenerationHandler : ICommandHandler
     {
         try
         {
-            if (!options.Summary)
+            if (!options.Quiet)
             {
                 _logger.LogInformation("Generating roadmap from {Count} work items", workItems.Count());
                 _logger.LogInformation("Processing work items for special title patterns (Release Trains)");
@@ -36,7 +36,7 @@ public class RoadmapGenerationHandler : ICommandHandler
 
             var roadmapItems = await _services.Roadmap.GenerateRoadmapAsync(workItems, options.AreaPath!);
 
-            if (!options.Summary)
+            if (!options.Quiet)
             {
                 _logger.LogInformation("Finished processing special title patterns");
                 Console.WriteLine("\nFinished processing special title patterns\n");

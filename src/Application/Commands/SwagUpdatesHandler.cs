@@ -29,7 +29,7 @@ public class SwagUpdatesHandler : ICommandHandler
         {
             const int separatorWidth = 60;
 
-            if (!options.Summary)
+            if (!options.Quiet)
             {
                 _logger.LogInformation("Starting SWAG updates on Release Trains in area path: {AreaPath}", options.AreaPath);
                 Console.WriteLine("\n" + "=".PadRight(separatorWidth, '='));

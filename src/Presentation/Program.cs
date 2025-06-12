@@ -15,7 +15,8 @@ using var loggerFactory = LoggerFactory.Create(builder =>
 {
     builder.AddConsole();
     // Use Warning level for summary mode to reduce noise
-    var logLevel = earlyOptions.Summary ? LogLevel.Warning : LogLevel.Information;
+    var logLevel = earlyOptions.Quiet ? LogLevel.Warning :
+                   earlyOptions.Verbose ? LogLevel.Debug : LogLevel.Information;
     builder.SetMinimumLevel(logLevel);
 });
 
@@ -68,8 +69,11 @@ static CommandLineOptions ParseEarlyArguments(string[] args)
     {
         switch (args[i].ToLowerInvariant())
         {
-            case "--summary" or "-s":
-                options.Summary = true;
+            case "--summary" or "-s" or "--quiet" or "-q":
+                options.Quiet = true;
+                break;
+            case "--verbose" or "-v":
+                options.Verbose = true;
                 break;
         }
     }
@@ -86,7 +90,8 @@ public class CommandLineOptions
     public string? AreaPath { get; set; }
     public bool RunHygieneChecks { get; set; } = false;
     public bool CreateRoadmap { get; set; } = false;
-    public bool Summary { get; set; } = false;
+    public bool Verbose { get; set; } = false;
+    public bool Quiet { get; set; } = false;
     public bool SwagUpdates { get; set; } = false;
     public bool SwagUpdatesAll { get; set; } = false;
 }
@@ -113,7 +118,7 @@ public class RoadmapApplication
 
             if (!ValidateOptions(options)) return;
 
-            if (!options.Summary)
+            if (!options.Quiet)
             {
                 _logger.LogInformation("Starting CreateRoadmapADO application");
             }
@@ -130,7 +135,7 @@ public class RoadmapApplication
             var results = await coordinator.ExecuteCommandsAsync(workItems, options);
 
             // Display roadmap results if applicable and not in summary mode
-            if (!options.Summary && options.CreateRoadmap)
+            if (!options.Quiet && options.CreateRoadmap)
             {
                 var roadmapItems = coordinator.GetRoadmapItems(results);
                 if (roadmapItems.Any())
@@ -209,7 +214,7 @@ public class RoadmapApplication
 
     private void LogWorkItemRetrievalOperation(CommandLineOptions options)
     {
-        if (options.Summary) return;
+        if (options.Quiet) return;
 
         if (options.RunHygieneChecks)
         {
@@ -231,7 +236,7 @@ public class RoadmapApplication
 
     private void HandleNoWorkItemsFound(CommandLineOptions options)
     {
-        if (!options.Summary)
+        if (!options.Quiet)
         {
             _logger.LogInformation("No work items found in area path '{AreaPath}'.", options.AreaPath);
         }
@@ -259,8 +264,11 @@ public class RoadmapApplication
                     if (i + 1 < args.Length)
                         options.AreaPath = args[++i];
                     break;
-                case "--summary" or "-s":
-                    options.Summary = true;
+                case "--summary" or "-s" or "--quiet" or "-q":
+                    options.Quiet = true;
+                    break;
+                case "--verbose" or "-v":
+                    options.Verbose = true;
                     break;
                 case "--hygiene-checks" or "--hygiene":
                     options.RunHygieneChecks = true;
@@ -277,6 +285,10 @@ public class RoadmapApplication
                         i++; // Skip the "all" argument
                     }
                     break;
+                case "--swag-all":
+                    options.SwagUpdates = true;
+                    options.SwagUpdatesAll = true;
+                    break;
                 case "--help" or "-h":
                     ShowHelp();
                     Environment.Exit(0);
@@ -286,49 +298,49 @@ public class RoadmapApplication
 
         return options;
     }
-
     private static void ShowHelp()
     {
         Console.WriteLine("CreateRoadmapADO - Generate roadmaps from Azure DevOps Feature work items");
         Console.WriteLine();
-        Console.WriteLine("Usage: CreateRoadmapADO --area-path <path> (--hygiene-checks | --create-roadmap | --swag-updates) [options]");
+        Console.WriteLine("Usage: CreateRoadmapADO --area-path <path> (--hygiene | --roadmap | --swag) [options]");
         Console.WriteLine();
         Console.WriteLine("Required:");
         Console.WriteLine("  -a, --area-path <path>    Azure DevOps area path to filter work items (e.g., \"SPOOL\\\\Resource Provider\")");
         Console.WriteLine();
         Console.WriteLine("Operations (at least one required):");
-        Console.WriteLine("  --hygiene-checks          Run ADO hygiene checks on Release Trains and Features");
-        Console.WriteLine("  --create-roadmap          Generate roadmap and create Release Train work items from patterns");
-        Console.WriteLine("  --swag-updates            Review Release Trains and manage SWAG calculations (auto-generated only)");
-        Console.WriteLine("  --swag-updates all        Update SWAG for ALL Release Trains (ignores auto-generated tag)");
+        Console.WriteLine("  --hygiene                 Run ADO hygiene checks on Release Trains and Features");
+        Console.WriteLine("  --roadmap                 Generate roadmap and create Release Train work items from patterns");
+        Console.WriteLine("  --swag                    Review Release Trains and manage SWAG calculations (auto-generated only)");
+        Console.WriteLine("  --swag-all                Update SWAG for ALL Release Trains (auto-generated and manual)");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  -l, --limit <number>      Maximum number of work items to retrieve (default: 100)");
-        Console.WriteLine("  -s, --summary             Enable summary mode (reduced output for automation)");
+        Console.WriteLine("  -v, --verbose             Enable verbose output (detailed logging and progress information)");
+        Console.WriteLine("  -q, --quiet               Enable quiet mode (minimal output, errors only)");
         Console.WriteLine("  -h, --help                Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  # Create roadmap only");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --create-roadmap");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --roadmap");
         Console.WriteLine();
         Console.WriteLine("  # Run hygiene checks only");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene-checks");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --hygiene");
         Console.WriteLine();
         Console.WriteLine("  # Update SWAG values for Release Trains (auto-generated only)");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --swag-updates");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --swag");
         Console.WriteLine();
         Console.WriteLine("  # Update SWAG values for ALL Release Trains");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --swag-updates all");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --swag-all");
         Console.WriteLine();
-        Console.WriteLine("  # Run multiple operations in summary mode");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --create-roadmap --hygiene-checks --summary");
+        Console.WriteLine("  # Run multiple operations in quiet mode");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"SPOOL\\\\Resource Provider\" --roadmap --hygiene --quiet");
         Console.WriteLine();
-        Console.WriteLine("  # Process more items");
-        Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --create-roadmap --limit 200");
+        Console.WriteLine("  # Process more items with verbose output");
+        Console.WriteLine("  CreateRoadmapADO --area-path \"MyProject\\\\MyTeam\" --roadmap --limit 200 --verbose");
         Console.WriteLine();
         Console.WriteLine("SWAG Updates Operation:");
-        Console.WriteLine("  • Normal mode: Only updates auto-generated Release Trains, shows warnings for manual ones");
-        Console.WriteLine("  • ALL mode: Updates ALL Release Trains regardless of auto-generated tag");
+        Console.WriteLine("  • Normal mode (--swag): Only updates auto-generated Release Trains, shows warnings for manual ones");
+        Console.WriteLine("  • ALL mode (--swag-all): Updates ALL Release Trains regardless of auto-generated tag");
         Console.WriteLine("  • For manual Release Trains (normal mode): Shows warnings if SWAG doesn't match Feature sum");
         Console.WriteLine("  • Only processes Release Trains with related Feature work items");
         Console.WriteLine("  • SWAG values are stored as [SWAG: value] prefix in the status notes field");

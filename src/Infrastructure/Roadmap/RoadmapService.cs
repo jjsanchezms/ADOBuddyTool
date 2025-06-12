@@ -231,13 +231,11 @@ public class RoadmapService
         _logger.LogInformation("Validating that Release Train #{Id} exists and is accessible", existingWorkItemId);
 
         // Get existing work item with relations to check what already exists
-        var existingWorkItem = await _azureDevOpsService.GetWorkItemWithRelationsAsync(existingWorkItemId);
-
-        if (existingWorkItem == null)
+        var existingWorkItem = await _azureDevOpsService.GetWorkItemWithRelationsAsync(existingWorkItemId); if (existingWorkItem == null)
         {
-            _logger.LogError("CRITICAL ERROR: Release Train #{Id} does not exist or is not accessible. Cannot create relations to non-existent work item.", existingWorkItemId);
-            _logger.LogError("This indicates a data integrity issue where the pattern references a work item ID that doesn't exist.");
-            _logger.LogWarning("AUTOMATIC RECOVERY: Creating a new Release Train instead of updating the non-existent one.");
+            _logger.LogInformation("Release Train #{Id} does not exist or is not accessible. Applying automatic recovery.", existingWorkItemId);
+            _logger.LogDebug("Pattern references a work item ID that doesn't exist - this can happen when work items are deleted or access is restricted.");
+            _logger.LogInformation("AUTOMATIC RECOVERY: Creating a new Release Train instead of updating the non-existent one.");
 
             // FEATURE: Automatic Error Recovery for Non-Existent Release Train References
             // When a Feature references a Release Train ID that doesn't exist (e.g., "----- GCCH -----rt:4160082"),
@@ -246,8 +244,7 @@ public class RoadmapService
             // 2. Update the Feature title with the new Release Train ID
             // 3. Link all children to the new Release Train
             // This ensures data integrity and prevents broken references while maintaining workflow continuity
-            _logger.LogError("Release Train #{Id} does not exist", existingWorkItemId);
-            _logger.LogInformation("Creating new Release Train instead");
+            _logger.LogInformation("Creating new Release Train as replacement for #{Id}", existingWorkItemId);
 
             try
             {

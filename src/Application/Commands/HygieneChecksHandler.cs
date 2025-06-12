@@ -29,7 +29,7 @@ public class HygieneChecksHandler : ICommandHandler
         {
             const int separatorWidth = 60;
 
-            if (!options.Summary)
+            if (!options.Quiet)
             {
                 _logger.LogInformation("Starting ADO hygiene checks on {Count} work items", workItems.Count());
                 Console.WriteLine("\n" + "=".PadRight(separatorWidth, '='));
