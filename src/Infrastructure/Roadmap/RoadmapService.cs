@@ -81,7 +81,7 @@ public class RoadmapService
 
         _logger.LogInformation("Scanning for special title patterns in work items"); foreach (var workItem in workItemsList)
         {            // Check for special title patterns
-            // Match titles like "----- TITLE -----rt" or "----------- TITLE ----------rt:1234"
+            // Match titles like "------------------------------- TITLE -------------------------------rt" or "----------- TITLE ----------rt:1234"
             // Only look for "rt" patterns (release trains)
             // Updated regex to handle various dash patterns and spacing
             var patternStart = new Regex(@"^---+\s*(.*?)\s*---+rt(?::(\d+))?$", RegexOptions.IgnoreCase);
@@ -238,7 +238,7 @@ public class RoadmapService
             _logger.LogInformation("AUTOMATIC RECOVERY: Creating a new Release Train instead of updating the non-existent one.");
 
             // FEATURE: Automatic Error Recovery for Non-Existent Release Train References
-            // When a Feature references a Release Train ID that doesn't exist (e.g., "----- GCCH -----rt:4160082"),
+            // When a Feature references a Release Train ID that doesn't exist (e.g., "------------------------------- GCCH -------------------------------rt:4160082"),
             // instead of failing, we:
             // 1. Create a new Release Train with the same title
             // 2. Update the Feature title with the new Release Train ID
@@ -372,17 +372,15 @@ public class RoadmapService
             });
         }
         return newWorkItemId;
-    }
-
-    /// <summary>
-    /// Updates the pattern work item title to include the newly created work item ID
-    /// </summary>
+    }    /// <summary>
+         /// Updates the pattern work item title to include the newly created work item ID
+         /// </summary>
     private async Task UpdatePatternItemWithId(int patternItemId, string title, int newWorkItemId)
     {
         try
         {
-            // Update the title to include the new work item ID
-            var newTitle = $"----- {title} -----rt:{newWorkItemId}";
+            // Update the title to include the new work item ID with extended dash formatting
+            var newTitle = $"------------------------------- {title} -------------------------------rt:{newWorkItemId}";
             await _azureDevOpsService.UpdateWorkItemTitleAsync(patternItemId, newTitle);
 
             _logger.LogInformation("Updated pattern item #{PatternItemId} title to include Release Train ID #{NewWorkItemId}",

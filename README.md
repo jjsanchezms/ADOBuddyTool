@@ -52,15 +52,15 @@ Update `appsettings.json` with your Azure DevOps details:
 The application automatically processes Feature work items with special title patterns to create Release Train work items:
 
 ### Pattern Format
-- Use titles like: `----- Release Train Name -----rt`
-- To update an existing Release Train: `----- Release Train Name -----rt:12345` (where 12345 is the existing work item ID)
+- Use titles like: `------------------------------- Release Train Name -------------------------------rt`
+- To update an existing Release Train: `------------------------------- Release Train Name -------------------------------rt:12345` (where 12345 is the existing work item ID)
 - End the group with: `------------`
 
 ### Automatic Error Recovery
-**NEW FEATURE**: When a Feature references a non-existent Release Train ID (e.g., `----- GCCH -----rt:4160082` where Release Train #4160082 doesn't exist), the application will:
+**NEW FEATURE**: When a Feature references a non-existent Release Train ID (e.g., `------------------------------- GCCH -------------------------------rt:4160082` where Release Train #4160082 doesn't exist), the application will:
 
 1. **Automatically create a new Release Train** instead of failing
-2. **Update the Feature title** with the new Release Train ID (e.g., `----- GCCH -----rt:4170000`)
+2. **Update the Feature title** with the new Release Train ID (e.g., `------------------------------- GCCH -------------------------------rt:4170000`)
 3. **Log the recovery operation** for transparency
 4. **Continue processing** without interruption
 
@@ -68,7 +68,7 @@ This ensures data integrity and prevents broken references while maintaining the
 
 ### Example
 ```
-Feature 1: ----- Q1 2024 Release -----rt
+Feature 1: ------------------------------- Q1 2024 Release -------------------------------rt
 Feature 2: User Authentication
 Feature 3: Payment Gateway
 Feature 4: Reporting Dashboard
@@ -79,7 +79,7 @@ This will create a Release Train called "Q1 2024 Release" with Features 2, 3, an
 
 ### Error Recovery Example
 ```
-Feature 1: ----- GCCH -----rt:4160082    # Non-existent Release Train ID
+Feature 1: ------------------------------- GCCH -------------------------------rt:4160082    # Non-existent Release Train ID
 Feature 2: Data Migration
 Feature 3: API Updates
 Feature 4: ------------
@@ -88,7 +88,7 @@ Feature 4: ------------
 **Result:**
 - ❌ Release Train #4160082 doesn't exist
 - 🔄 Creates new Release Train #4170000 instead
-- ✅ Updates Feature 1 title to: `----- GCCH -----rt:4170000`
+- ✅ Updates Feature 1 title to: `------------------------------- GCCH -------------------------------rt:4170000`
 - ✅ Links Features 2 and 3 to the new Release Train
 
 ## Usage
