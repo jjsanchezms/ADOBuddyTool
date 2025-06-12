@@ -1,7 +1,6 @@
 using ADOBuddyTool.Domain.Entities;
 using Microsoft.Extensions.Logging;
 using System.Text;
-using System.Text.Json;
 
 namespace ADOBuddyTool.Infrastructure.Output;
 
@@ -11,86 +10,12 @@ namespace ADOBuddyTool.Infrastructure.Output;
 public class OutputService
 {
     private readonly ILogger<OutputService> _logger;
-    private readonly JsonSerializerOptions _jsonOptions; public OutputService(ILogger<OutputService> logger)
+
+    public OutputService(ILogger<OutputService> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        _jsonOptions = new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
     }
 
-    public async Task ExportToJsonAsync(IEnumerable<RoadmapItem> roadmapItems, string filePath, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            _logger.LogInformation("Exporting {Count} roadmap items to JSON: {FilePath}", roadmapItems.Count(), filePath);
-
-            // Ensure directory exists
-            var directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            var json = JsonSerializer.Serialize(roadmapItems, _jsonOptions);
-            await File.WriteAllTextAsync(filePath, json, cancellationToken);
-
-            _logger.LogInformation("Successfully exported roadmap to JSON file: {FilePath}", filePath);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error exporting roadmap to JSON file: {FilePath}", filePath);
-            throw;
-        }
-    }
-    public async Task ExportToCsvAsync(IEnumerable<RoadmapItem> roadmapItems, string filePath, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            _logger.LogInformation("Exporting {Count} roadmap items to CSV: {FilePath}", roadmapItems.Count(), filePath);
-
-            // Ensure directory exists
-            var directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            var csv = new StringBuilder();
-
-            // Header
-            csv.AppendLine("Id,Title,Description,Type,Status,AssignedTo,StartDate,EndDate,Priority,StackRank,Dependencies,Tags");
-
-            // Data rows
-            foreach (var item in roadmapItems)
-            {
-                csv.AppendLine($"{item.Id}," +
-                              $"\"{EscapeCsvValue(item.Title)}\"," +
-                              $"\"{EscapeCsvValue(item.Description)}\"," +
-                              $"{item.Type}," +
-                              $"{item.Status}," +
-                              $"\"{EscapeCsvValue(item.AssignedTo ?? string.Empty)}\"," +
-                              $"{item.StartDate:yyyy-MM-dd}," +
-                              $"{item.EndDate:yyyy-MM-dd}," +
-                              $"{item.Priority}," +
-                              $"{item.StackRank:F1}," +
-                              $"\"{string.Join(";", item.Dependencies)}\"," +
-                              $"\"{string.Join(";", item.Tags)}\"");
-            }
-
-            await File.WriteAllTextAsync(filePath, csv.ToString(), cancellationToken);
-
-            _logger.LogInformation("Successfully exported roadmap to CSV file: {FilePath}", filePath);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error exporting roadmap to CSV file: {FilePath}", filePath);
-            throw;
-        }
-    }
     public void DisplayInConsole(IEnumerable<RoadmapItem> roadmapItems)
     {
         try
@@ -134,6 +59,7 @@ public class OutputService
             throw;
         }
     }
+
     private static void DisplayRoadmapItem(RoadmapItem item)
     {
         // Format StackRank with more detail and highlight if it's missing
@@ -152,7 +78,9 @@ public class OutputService
             stackRank = "N/A (!)"; // Make missing values stand out
         }
         // Format display in table-like structure
-        Console.WriteLine($"{item.Id,-5} {stackRank,-12} {item.Type,-10} {item.Status,-12} {TruncateString(item.Title, 40),-40}");        // Show description on next line with indentation
+        Console.WriteLine($"{item.Id,-5} {stackRank,-12} {item.Type,-10} {item.Status,-12} {TruncateString(item.Title, 40),-40}");
+
+        // Show description on next line with indentation
         Console.WriteLine($"      Description: {TruncateString(item.Description, 72)}");
 
         // Always show StackRank info with details about how it affects sorting
@@ -168,15 +96,6 @@ public class OutputService
     {
         if (string.IsNullOrEmpty(value)) return string.Empty;
         return value.Length <= maxLength ? value : value.Substring(0, maxLength - 3) + "...";
-    }
-
-    private static string EscapeCsvValue(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return string.Empty;
-
-        // Escape quotes by doubling them
-        return value.Replace("\"", "\"\"");
     }
 
     /// <summary>
@@ -202,15 +121,12 @@ public class OutputService
 
             switch (extension)
             {
-                case ".json":
-                    await ExportHygieneCheckResultsToJsonAsync(hygieneResults, filePath, cancellationToken);
-                    break;
                 case ".csv":
                     await ExportHygieneCheckResultsToCsvAsync(hygieneResults, filePath, cancellationToken);
                     break;
                 default:
-                    // Default to JSON if no extension or unknown extension
-                    await ExportHygieneCheckResultsToJsonAsync(hygieneResults, filePath + ".json", cancellationToken);
+                    // Default to CSV if no extension or unknown extension
+                    await ExportHygieneCheckResultsToCsvAsync(hygieneResults, filePath + ".csv", cancellationToken);
                     break;
             }
 
@@ -221,15 +137,6 @@ public class OutputService
             _logger.LogError(ex, "Error exporting hygiene check results to file: {FilePath}", filePath);
             throw;
         }
-    }
-
-    /// <summary>
-    /// Exports hygiene check results to JSON format
-    /// </summary>
-    private async Task ExportHygieneCheckResultsToJsonAsync(HygieneCheckSummary hygieneResults, string filePath, CancellationToken cancellationToken)
-    {
-        var json = JsonSerializer.Serialize(hygieneResults, _jsonOptions);
-        await File.WriteAllTextAsync(filePath, json, cancellationToken);
     }
 
     /// <summary>

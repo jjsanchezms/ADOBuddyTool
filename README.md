@@ -4,7 +4,7 @@ A C# .NET 8 console application that generates roadmaps from Azure DevOps Featur
 
 ## Overview
 
-This application connects to Azure DevOps, retrieves Feature work items from a specified area path, processes special title patterns to create Release Trains, and generates roadmaps that can be exported to JSON, CSV, or displayed in the console.
+This application connects to Azure DevOps, retrieves Feature work items from a specified area path, processes special title patterns to create Release Trains, and generates roadmaps that can be exported to CSV or displayed in the console.
 
 ## Architecture
 
@@ -308,25 +308,6 @@ Blocked: 3
 Cancelled: 2
 ```
 
-### JSON Output
-```json
-[  {
-    "id": 12345,
-    "title": "User Authentication Feature",
-    "description": "Work Item: Feature - User Authentication Feature",
-    "type": "Feature",
-    "status": "InProgress",
-    "assignedTo": "john.doe@company.com",
-    "startDate": "2024-01-15T00:00:00",
-    "endDate": "2024-02-15T00:00:00",
-    "priority": 1,
-    "stackRank": 100.5,
-    "dependencies": [],
-    "tags": ["Feature", "Security"]
-  }
-]
-```
-
 ## Error Handling
 
 The application includes comprehensive error handling:
@@ -372,7 +353,7 @@ This application follows clean architecture principles:
 - **Status Documentation**: Checks for adequate descriptions and documentation coverage
 - **Release Train Quality**: Validates feature count, tagging, and overall completeness
 - **State Consistency**: Ensures Release Train states reflect actual Feature progress
-- **Exportable Reports**: Export hygiene check results to JSON or CSV formats
+- **Exportable Reports**: Export hygiene check results to CSV format
 - **Severity Classification**: Critical, Error, Warning, and Info level categorization
 - **Flexible Output**: Multiple export formats with optional file specification
 - **Better Error Handling**: Improved error messages and validation
