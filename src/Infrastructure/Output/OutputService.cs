@@ -1,11 +1,10 @@
 using ADOBuddyTool.Domain.Entities;
 using Microsoft.Extensions.Logging;
-using System.Text;
 
 namespace ADOBuddyTool.Infrastructure.Output;
 
 /// <summary>
-/// Service for output generation in various formats
+/// Service for output generation in console format
 /// </summary>
 public class OutputService
 {
@@ -91,7 +90,6 @@ public class OutputService
             Console.WriteLine($"      Dependencies: {string.Join(", ", item.Dependencies)}");
         }
     }
-
     private static string TruncateString(string value, int maxLength)
     {
         if (string.IsNullOrEmpty(value)) return string.Empty;
@@ -106,83 +104,10 @@ public class OutputService
     /// <param name="cancellationToken">Cancellation token</param>
     public async Task ExportHygieneCheckResultsAsync(HygieneCheckSummary hygieneResults, string filePath, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            _logger.LogInformation("Exporting hygiene check results to: {FilePath}", filePath);
-
-            // Ensure directory exists
-            var directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            var extension = Path.GetExtension(filePath).ToLowerInvariant();
-
-            switch (extension)
-            {
-                case ".csv":
-                    await ExportHygieneCheckResultsToCsvAsync(hygieneResults, filePath, cancellationToken);
-                    break;
-                default:
-                    // Default to CSV if no extension or unknown extension
-                    await ExportHygieneCheckResultsToCsvAsync(hygieneResults, filePath + ".csv", cancellationToken);
-                    break;
-            }
-
-            _logger.LogInformation("Successfully exported hygiene check results to: {FilePath}", filePath);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error exporting hygiene check results to file: {FilePath}", filePath);
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Exports hygiene check results to CSV format
-    /// </summary>
-    private async Task ExportHygieneCheckResultsToCsvAsync(HygieneCheckSummary hygieneResults, string filePath, CancellationToken cancellationToken)
-    {
-        var csv = new StringBuilder();
-
-        // Add header
-        csv.AppendLine("CheckName,Passed,Severity,Description,Details,WorkItemId,WorkItemTitle,Recommendation");
-
-        // Add data rows
-        foreach (var result in hygieneResults.CheckResults)
-        {
-            var row = string.Join(",",
-                EscapeCsvField(result.CheckName),
-                result.Passed,
-                result.Severity,
-                EscapeCsvField(result.Description),
-                EscapeCsvField(result.Details),
-                result.WorkItemId,
-                EscapeCsvField(result.WorkItemTitle),
-                EscapeCsvField(result.Recommendation)
-            );
-            csv.AppendLine(row);
-        }
-
-        await File.WriteAllTextAsync(filePath, csv.ToString(), cancellationToken);
-    }
-
-    private static string EscapeCsvField(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return string.Empty;
-
-        // Escape quotes by doubling them
-        value = value.Replace("\"", "\"\"");
-
-        // If the field contains commas, newlines, or quotes, enclose it in double quotes
-        if (value.Contains(",") || value.Contains("\n") || value.Contains("\""))
-        {
-            value = $"\"{value}\"";
-        }
-
-        return value;
+        // CSV export functionality has been removed
+        // Only console display is now supported for hygiene check results
+        _logger.LogWarning("Export functionality for hygiene check results has been removed. Results are displayed in console only.");
+        await Task.CompletedTask;
     }
 }
 

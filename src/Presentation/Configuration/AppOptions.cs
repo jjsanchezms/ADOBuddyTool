@@ -10,7 +10,7 @@ public class AppOptions
     public int MaxWorkItems { get; set; } = 1000;
 
     /// <summary>
-    /// Default output format (csv, console)
+    /// Default output format (console)
     /// </summary>
     public string DefaultOutputFormat { get; set; } = "console";
 

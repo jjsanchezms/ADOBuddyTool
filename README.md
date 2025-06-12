@@ -4,7 +4,7 @@ A C# .NET 8 console application that generates roadmaps from Azure DevOps Featur
 
 ## Overview
 
-This application connects to Azure DevOps, retrieves Feature work items from a specified area path, processes special title patterns to create Release Trains, and generates roadmaps that can be exported to CSV or displayed in the console.
+This application connects to Azure DevOps, retrieves Feature work items from a specified area path, processes special title patterns to create Release Trains, and generates roadmaps that can be displayed in the console.
 
 ## Architecture
 
@@ -353,7 +353,7 @@ This application follows clean architecture principles:
 - **Status Documentation**: Checks for adequate descriptions and documentation coverage
 - **Release Train Quality**: Validates feature count, tagging, and overall completeness
 - **State Consistency**: Ensures Release Train states reflect actual Feature progress
-- **Exportable Reports**: Export hygiene check results to CSV format
+- **Exportable Reports**: Export hygiene check results are displayed in console format
 - **Severity Classification**: Critical, Error, Warning, and Info level categorization
 - **Flexible Output**: Multiple export formats with optional file specification
 - **Better Error Handling**: Improved error messages and validation
